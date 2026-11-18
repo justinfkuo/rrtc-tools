@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Steel Tape Temperature Correction Calculator</title>
+    
+    <!-- iOS / Apple Web App Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tape Calc">
+    
+    <!-- Android / General Web App Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#020617"> <!-- Matches Slate 950 background -->
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617; /* Slate 950 */
+            color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(71, 85, 105, 0.8);
+            border-radius: 4px;
+        }
+        .active-touch:active {
+            transform: scale(0.97);
+        }
+        /* Mobile padding for bottom bar */
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 1rem);
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-6 lg:mb-8 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-emerald-400">
+                    Steel Tape Temperature Correction Calculator
+                </h1>
+                <p class="text-sm text-slate-400 mt-1">World Athletics & AIMS Calibration Standard</p>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <div class="lg:col-span-5 bg-slate-950 border border-slate-800/80 rounded-2xl p-4 sm:p-6 shadow-xl space-y-5 relative">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-base font-bold text-white mb-0.5">Field Parameters</h3>
+                        <p class="text-xs text-slate-400">Adjust thermal conditions.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5 shadow-inner">
+                            <button id="btnMetric" onclick="setUnits(true)" class="px-2.5 py-1 text-[11px] font-bold rounded-md bg-sky-500/20 text-sky-400 transition-colors">Metric</button>
+                            <button id="btnImperial" onclick="setUnits(false)" class="px-2.5 py-1 text-[11px] font-bold rounded-md text-slate-500 hover:text-slate-300 transition-colors">Imperial</button>
+                        </div>
+                        <button onclick="resetToDefaults()" class="text-xs text-sky-400 hover:text-sky-300 font-medium border border-sky-500/20 px-2.5 py-1 rounded-lg bg-sky-500/10 active-touch transition-colors">Reset</button>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Nominal Length -->
+                    <div class="space-y-1.5">
+                        <label for="nominalLength" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                            Nominal Tape Length (<span id="lblUnitTitleNominal">m</span>)
+                        </label>
+                        <div class="relative">
+                            <input type="number" id="nominalLength" value="300" min="0.01" step="0.1" 
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3 pr-10 py-3 text-sm font-semibold text-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors">
+                            <span id="lblUnitInputNominal" class="absolute right-3 top-3 text-slate-500 text-sm font-medium">m</span>
+                        </div>
+                    </div>
+
+                    <!-- Temperatures -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1.5">
+                            <label for="calibTemp" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                                Calibrated Temp
+                            </label>
+                            <div class="relative">
+                                <input type="number" id="calibTemp" value="20" step="1" 
+                                    class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-3 pr-8 py-3 text-sm font-semibold text-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors">
+                                <span id="lblUnitInputCalib" class="absolute right-3 top-3 text-slate-500 text-sm font-medium">°C</span>
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-1.5">
+                            <label for="measuredTempInput" class="block text-xs font-semibold text-amber-400 uppercase tracking-wider">
+                                Field Temp
+                            </label>
+                            <div class="relative">
+                                <input type="number" id="measuredTempInput" value="32" step="0.1" 
+                                    class="w-full bg-slate-900 border border-amber-500/50 rounded-xl pl-3 pr-8 py-3 text-sm font-bold text-amber-300 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-colors">
+                                <span id="lblUnitInputMeasured" class="absolute right-3 top-3 text-slate-500 text-sm font-medium">°C</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Field Temp Slider -->
+                    <div class="pt-1 pb-1">
+                        <div class="flex justify-between text-xs mb-1.5 font-medium">
+                            <span id="lblSliderCold" class="text-slate-400">Cold (-10°C)</span>
+                            <span id="sliderTempDisplay" class="text-amber-400 font-bold font-mono">32.0 °C</span>
+                            <span id="lblSliderHot" class="text-slate-400">Hot (50°C)</span>
+                        </div>
+                        <input type="range" id="measuredTempSlider" min="-10" max="50" value="32" step="0.1" 
+                            class="w-full h-3 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500 touch-pan-x">
+                    </div>
+
+                    <!-- Presets -->
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Quick Presets</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button id="btnPreset1" onclick="setPreset('cold')" class="py-2 px-2 text-xs bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl text-slate-300 hover:text-sky-300 active-touch font-medium transition">5°C (Cold)</button>
+                            <button id="btnPreset2" onclick="setPreset('base')" class="py-2 px-2 text-xs bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-xl text-slate-300 hover:text-emerald-300 active-touch font-medium transition">20°C (Base)</button>
+                            <button id="btnPreset3" onclick="setPreset('hot')" class="py-2 px-2 text-xs bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-xl text-slate-300 hover:text-amber-300 active-touch font-medium transition">38°C (Hot)</button>
+                        </div>
+                    </div>
+
+                    <!-- Coefficient -->
+                    <div class="space-y-1.5 pt-2 border-t border-slate-800/60">
+                        <label for="coefficient" class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                            Expansion Coefficient (α)
+                        </label>
+                        <input type="number" id="coefficient" value="0.0000116" step="0.0000001" 
+                            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-sky-500 transition-colors font-mono">
+                        <p id="lblCoeffHint" class="text-[10px] text-slate-500">Standard steel tape: 0.0000116 / °C</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel (Right) -->
+            <div class="lg:col-span-7 space-y-5">
+                
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+                    <!-- Background accent -->
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-sky-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+                    <h2 class="text-lg font-bold text-white mb-4">Simulation Results</h2>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                        <!-- True Ground Length Box -->
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">True Field Length</p>
+                            <div class="flex items-baseline gap-2">
+                                <span id="resTrueLength" class="text-2xl sm:text-3xl font-bold text-white font-mono">300.00000</span>
+                                <span id="resUnit" class="text-slate-400 font-medium">m</span>
+                            </div>
+                            <div class="mt-2 flex items-center">
+                                <span id="statusBadge" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                    Standard
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Deltas Box -->
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-center space-y-3">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-slate-400">Δ Temperature:</span>
+                                <span id="resTempDiff" class="text-sm font-bold text-white font-mono">+0.0 °C</span>
+                            </div>
+                            <div class="w-full h-px bg-slate-800"></div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-slate-400">Correction (ΔL)*:</span>
+                                <span id="resCorrection" class="text-sm font-bold text-emerald-400 font-mono">+0.00 mm</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Calibrated Baseline & Field Tape Visualizer -->
+                    <div class="space-y-4 pt-1 pb-4">
+                        <div class="flex justify-between items-end mb-2">
+                            <h3 class="text-sm font-bold text-white">Tape Deformation Visualizer</h3>
+                        </div>
+
+                        <!-- Baseline Tape -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs text-slate-400 font-medium">
+                                <span>Calibrated Baseline (<span id="lblCalibTemp">20</span><span id="lblUnitVisCalib">°C</span>)</span>
+                                <span id="lblNominalLength" class="font-mono text-white">300.00000 m</span>
+                            </div>
+                            <div class="h-6 w-full bg-slate-950 rounded-lg border border-slate-800 relative flex items-center pl-2 pr-2">
+                                <!-- Baseline 50% marker -->
+                                <div class="absolute left-[50%] top-0 bottom-0 w-px bg-slate-700 z-0"></div>
+                                <!-- Static Baseline Tape (Always exactly 50% width visually, anchored left) -->
+                                <div class="w-[50%] h-1.5 bg-slate-500 rounded relative z-10 origin-left ml-4">
+                                    <div class="absolute left-0 -top-2.5 -bottom-2.5 w-0.5 bg-slate-400"></div>
+                                    <div class="absolute right-0 -top-2.5 -bottom-2.5 w-0.5 bg-slate-400"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Field Tape -->
+                        <div class="space-y-1 mt-4">
+                            <div class="flex justify-between text-xs text-emerald-400 font-medium">
+                                <span>Field Tape (<span id="lblFieldTempVis">32</span><span id="lblUnitVisField">°C</span>)</span>
+                                <span id="lblTrueLengthVis" class="font-mono text-emerald-300">300.00000 m</span>
+                            </div>
+                            <div class="h-6 w-full bg-slate-950 rounded-lg border border-slate-800 relative flex items-center pl-2 pr-2">
+                                <!-- Baseline 50% marker reference for comparison -->
+                                <div class="absolute left-[50%] top-0 bottom-0 w-px bg-slate-700 z-0"></div>
+                                
+                                <!-- Animated Field Tape (Anchored left, grows/shrinks past 50%) -->
+                                <div id="tapeVisualizer" class="w-[50%] h-1.5 bg-emerald-500 rounded relative shadow-[0_0_8px_rgba(16,185,129,0.5)] transition-all duration-300 ease-out z-10 origin-left ml-4">
+                                    <div class="absolute left-0 -top-2.5 -bottom-2.5 w-0.5 bg-white/50"></div>
+                                    <div class="absolute right-0 -top-2.5 -bottom-2.5 w-0.5 bg-white/50"></div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[9px] text-slate-500 italic">*Visual deformation scale exaggerated</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Details Box -->
+                    <div id="descriptionBox" class="p-3.5 rounded-xl text-xs leading-relaxed border bg-emerald-950/20 border-emerald-500/20 text-slate-300 mt-2">
+                    </div>
+                </div>
+
+                <div id="logEntriesContainer" class="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                    <!-- Log entries injected here -->
+                    <p id="emptyLogMsg" class="text-xs text-slate-500 italic text-center py-4">No field logs recorded yet.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subtle Footer Credit -->
+        <div class="mt-8 mb-2 text-center">
+            <p class="text-xs text-slate-600 font-medium">Created by Justin Kuo</p>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full shadow-2xl border border-slate-700 text-xs font-medium opacity-0 pointer-events-none transition-opacity duration-300 z-50 flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <span id="toastMsg">Action successful</span>
+        </div>
+
+        <!-- Sticky Mobile Bottom Bar -->
+        <div class="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 p-3 lg:hidden flex items-center justify-between z-40 pb-safe">
+            <div class="flex flex-col">
+                <span class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">True Field Length</span>
+                <span id="mobileBottomTrueLen" class="text-base font-bold text-white font-mono">300.00000 m</span>
+            </div>
+            <button onclick="saveLogEntry()" class="px-4 py-2 bg-sky-600 active:bg-sky-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-sky-900/20 transition-colors">
+                Save Reading
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Global State
+        let isMetric = true;
+
+        // UI Element References
+        const ui = {
+            nominal: document.getElementById('nominalLength'),
+            calib: document.getElementById('calibTemp'),
+            measuredInput: document.getElementById('measuredTempInput'),
+            measuredSlider: document.getElementById('measuredTempSlider'),
+            coeff: document.getElementById('coefficient'),
+            
+            // Labels
+            lblUnitTitleNominal: document.getElementById('lblUnitTitleNominal'),
+            lblUnitInputNominal: document.getElementById('lblUnitInputNominal'),
+            lblUnitInputCalib: document.getElementById('lblUnitInputCalib'),
+            lblUnitInputMeasured: document.getElementById('lblUnitInputMeasured'),
+            lblSliderCold: document.getElementById('lblSliderCold'),
+            lblSliderHot: document.getElementById('lblSliderHot'),
+            lblCoeffHint: document.getElementById('lblCoeffHint'),
+            sliderTempDisplay: document.getElementById('sliderTempDisplay'),
+            lblCalibTemp: document.getElementById('lblCalibTemp'),
+            lblUnitVisCalib: document.getElementById('lblUnitVisCalib'),
+            lblFieldTempVis: document.getElementById('lblFieldTempVis'),
+            lblUnitVisField: document.getElementById('lblUnitVisField'),
+            lblNominalLength: document.getElementById('lblNominalLength'),
+            lblTrueLengthVis: document.getElementById('lblTrueLengthVis'),
+            
+            // Buttons
+            btnMetric: document.getElementById('btnMetric'),
+            btnImperial: document.getElementById('btnImperial'),
+            btnPreset1: document.getElementById('btnPreset1'),
+            btnPreset2: document.getElementById('btnPreset2'),
+            btnPreset3: document.getElementById('btnPreset3'),
+
+            // Results
+            resTrueLength: document.getElementById('resTrueLength'),
+            resUnit: document.getElementById('resUnit'),
+            statusBadge: document.getElementById('statusBadge'),
+            resTempDiff: document.getElementById('resTempDiff'),
+            resCorrection: document.getElementById('resCorrection'),
+            tapeVisualizer: document.getElementById('tapeVisualizer'),
+            descriptionBox: document.getElementById('descriptionBox'),
+            mobileBottomTrueLen: document.getElementById('mobileBottomTrueLen')
+        };
+
+        // --- 1. Core Mathematical Logic & Simulator updates ---
+        function calculate() {
+            // Parse inputs
+            const minNominal = isMetric ? 0.01 : 0.0833; // Minimum 1 cm or ~1 inch
+            let rawNominal = parseFloat(ui.nominal.value);
+            const nominal = (isNaN(rawNominal) || rawNominal < minNominal) ? minNominal : rawNominal;
+            
+            const calib = parseFloat(ui.calib.value) || 0;
+            const measured = parseFloat(ui.measuredInput.value) || 0;
+            const coeff = parseFloat(ui.coeff.value) || 0;
+
+            // Compute Thermal Expansion
+            const tempDiff = measured - calib;
+            const deltaL = nominal * coeff * tempDiff;
+            const trueLength = nominal + deltaL;
+
+            // Unit Strings
+            const lenUnit = isMetric ? 'm' : 'ft';
+            const tempUnit = isMetric ? '°C' : '°F';
+            const corrUnit = isMetric ? 'mm' : 'in';
+            const corrMultiplier = isMetric ? 1000 : 12; // m -> mm or ft -> in
+
+            // Format Correction Amount
+            const correctionAmount = deltaL * corrMultiplier;
+            const sign = tempDiff >= 0 ? '+' : '';
+            
+            // Update Number Displays
+            ui.resTrueLength.innerText = trueLength.toFixed(5);
+            ui.mobileBottomTrueLen.innerText = `${trueLength.toFixed(5)} ${lenUnit}`;
+            ui.resUnit.innerText = lenUnit;
+            ui.lblNominalLength.innerText = `${nominal.toFixed(5)} ${lenUnit}`;
+            ui.lblTrueLengthVis.innerText = `${trueLength.toFixed(5)} ${lenUnit}`;
+            ui.lblCalibTemp.innerText = calib.toFixed(1);
+            ui.lblFieldTempVis.innerText = measured.toFixed(1);
+            
+            ui.resTempDiff.innerText = `${sign}${tempDiff.toFixed(1)} ${tempUnit}`;
+            ui.resCorrection.innerText = `${sign}${correctionAmount.toFixed(isMetric ? 2 : 3)} ${corrUnit}`;
+            ui.sliderTempDisplay.innerText = `${measured.toFixed(1)} ${tempUnit}`;
+
+            // Update Visuals & Status Badge
+            let badgeClass = '';
+            let badgeText = '';
+            let boxClass = 'p-3.5 rounded-xl text-xs leading-relaxed border mt-6 transition-colors ';
+            let descHtml = '';
+            let visWidth = 50; // Base width percentage
+            let visColor = 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
+            let visTextColor = 'text-emerald-400';
+            let visTrueLenColor = 'text-emerald-300';
+
+            if (tempDiff > 0.05) {
+                // Expansion
+                badgeText = 'Expanded';
+                badgeClass = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30';
+                boxClass += 'bg-amber-950/20 border-amber-500/20 text-amber-200';
+                descHtml = `<strong class="text-amber-400 font-bold">* Tape Expanded:</strong> Field is hotter than standard, so the tape has physically stretched.<br>
+                <ul class="list-disc pl-4 mt-2 space-y-1.5">
+                    <li><span class="text-white font-medium">Laying out a course:</span> Move your final endpoint <strong class="text-amber-300">${Math.abs(correctionAmount).toFixed(2)} ${corrUnit} CLOSER</strong> to ensure the true ground distance is exactly ${nominal}${lenUnit}.</li>
+                    <li><span class="text-white font-medium">Measuring between fixed points:</span> If the tape readings total ${nominal.toFixed(3)} ${lenUnit}, record the actual true ground distance as <strong class="text-amber-300">${(nominal + deltaL).toFixed(3)} ${lenUnit}</strong>.</li>
+                </ul>`;
+                visWidth = 50 + Math.min(45, (tempDiff / (isMetric ? 30 : 54)) * 40); 
+                visColor = 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]';
+                visTextColor = 'text-amber-400';
+                visTrueLenColor = 'text-amber-300';
+            } else if (tempDiff < -0.05) {
+                // Contraction
+                badgeText = 'Contracted';
+                badgeClass = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-sky-500/20 text-sky-400 border border-sky-500/30';
+                boxClass += 'bg-sky-950/20 border-sky-500/20 text-sky-200';
+                descHtml = `<strong class="text-sky-400 font-bold">* Tape Contracted:</strong> Field is colder than standard, so the tape has physically shrunk.<br>
+                <ul class="list-disc pl-4 mt-2 space-y-1.5">
+                    <li><span class="text-white font-medium">Laying out a course:</span> Add <strong class="text-sky-300">${Math.abs(correctionAmount).toFixed(2)} ${corrUnit}</strong> past your nominal mark on the final tape pull (so the tape readings total ${(nominal - deltaL).toFixed(3)} ${lenUnit}) to ensure the true ground distance is exactly ${nominal}${lenUnit}.</li>
+                    <li><span class="text-white font-medium">Measuring between fixed points:</span> If the tape readings total ${nominal.toFixed(3)} ${lenUnit}, the actual true ground distance is <strong class="text-sky-300">${Math.abs(correctionAmount).toFixed(2)} ${corrUnit} LESS</strong> (${(nominal + deltaL).toFixed(3)} ${lenUnit}).</li>
+                </ul>`;
+                visWidth = 50 - Math.min(45, (Math.abs(tempDiff) / (isMetric ? 30 : 54)) * 40);
+                visColor = 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]';
+                visTextColor = 'text-sky-400';
+                visTrueLenColor = 'text-sky-300';
+            } else {
+                // Nominal
+                badgeText = 'Standard';
+                badgeClass = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                boxClass += 'bg-emerald-950/20 border-emerald-500/20 text-emerald-200';
+                descHtml = `<strong class="text-emerald-400 font-bold">* Base Standard:</strong> Field temperature matches calibration standard. Physical markings represent true distance exactly.<br>
+                <ul class="list-disc pl-4 mt-2 space-y-1.5">
+                    <li><span class="text-white font-medium">Laying out a course:</span> Ensure the tape readings total exactly ${nominal}${lenUnit} to ensure the true ground distance is exactly ${nominal}${lenUnit}.</li>
+                    <li><span class="text-white font-medium">Measuring between fixed points:</span> If the tape readings total ${nominal.toFixed(3)} ${lenUnit}, record the actual true ground distance as exactly <strong class="text-emerald-300">${nominal.toFixed(3)} ${lenUnit}</strong>.</li>
+                </ul>`;
+                visWidth = 50;
+                visColor = 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]';
+                visTextColor = 'text-emerald-400';
+                visTrueLenColor = 'text-emerald-300';
+            }
+
+            ui.statusBadge.className = badgeClass;
+            ui.statusBadge.innerText = badgeText;
+            ui.descriptionBox.className = boxClass;
+            ui.descriptionBox.innerHTML = descHtml;
+            
+            // Update visualizer colors and labels
+            ui.lblFieldTempVis.parentElement.className = `flex justify-between text-xs font-medium ${visTextColor}`;
+            ui.lblTrueLengthVis.className = `font-mono ${visTrueLenColor}`;
+
+            ui.tapeVisualizer.className = `h-1.5 rounded relative transition-all duration-300 ease-out z-10 origin-left ml-4 ${visColor}`;
+            
+            if (Math.abs(tempDiff) <= 0.05) {
+                ui.tapeVisualizer.style.width = `50%`;
+            } else {
+                ui.tapeVisualizer.style.width = `calc(${visWidth}% - 1rem)`;
+            }
+        }
+
+        // --- 2. Unit Toggling & Hardcoded Standard Coefficients ---
+        function setUnits(metric) {
+            if (isMetric === metric) return; // No change
+            
+            isMetric = metric;
+
+            // Hardcode standard coefficients to prevent conversion precision loss
+            if (isMetric) {
+                ui.coeff.value = "0.0000116";
+            } else {
+                ui.coeff.value = "0.00000645";
+            }
+
+            // Convert Current Input Values
+            let nom = parseFloat(ui.nominal.value) || 0;
+            let cal = parseFloat(ui.calib.value) || 0;
+            let meas = parseFloat(ui.measuredInput.value) || 0;
+
+            if (isMetric) {
+                // Imperial to Metric
+                ui.nominal.value = (nom / 3.2808399).toFixed(1);
+                ui.calib.value = ((cal - 32) * 5/9).toFixed(1);
+                
+                // Set Slider Bounds for Metric FIRST so the browser doesn't clamp the value
+                ui.measuredSlider.min = -10;
+                ui.measuredSlider.max = 50;
+
+                let measC = ((meas - 32) * 5/9);
+                ui.measuredInput.value = measC.toFixed(1);
+                ui.measuredSlider.value = measC.toFixed(1);
+                
+                // Update Labels
+                ui.lblUnitTitleNominal.innerText = 'm';
+                ui.lblUnitInputNominal.innerText = 'm';
+                ui.lblUnitInputCalib.innerText = '°C';
+                ui.lblUnitInputMeasured.innerText = '°C';
+                ui.lblUnitVisCalib.innerText = '°C';
+                ui.lblUnitVisField.innerText = '°C';
+                ui.lblSliderCold.innerText = 'Cold (-10°C)';
+                ui.lblSliderHot.innerText = 'Hot (50°C)';
+                ui.lblCoeffHint.innerText = 'Standard steel tape: 0.0000116 / °C';
+
+                // Update Presets labels
+                ui.btnPreset1.innerText = '5°C (Cold)';
+                ui.btnPreset2.innerText = '20°C (Base)';
+                ui.btnPreset3.innerText = '38°C (Hot)';
+
+                // Update Button Active States
+                ui.btnMetric.className = "px-2.5 py-1 text-[11px] font-bold rounded-md bg-sky-500/20 text-sky-400 transition-colors";
+                ui.btnImperial.className = "px-2.5 py-1 text-[11px] font-bold rounded-md text-slate-500 hover:text-slate-300 transition-colors bg-transparent";
+
+            } else {
+                // Metric to Imperial
+                ui.nominal.value = (nom * 3.2808399).toFixed(1);
+                ui.calib.value = ((cal * 9/5) + 32).toFixed(1);
+                
+                // Set Slider Bounds for Imperial FIRST so the browser doesn't clamp the value
+                ui.measuredSlider.min = 14;
+                ui.measuredSlider.max = 122;
+
+                let measF = ((meas * 9/5) + 32);
+                ui.measuredInput.value = measF.toFixed(1);
+                ui.measuredSlider.value = measF.toFixed(1);
+                
+                // Update Labels
+                ui.lblUnitTitleNominal.innerText = 'ft';
+                ui.lblUnitInputNominal.innerText = 'ft';
+                ui.lblUnitInputCalib.innerText = '°F';
+                ui.lblUnitInputMeasured.innerText = '°F';
+                ui.lblUnitVisCalib.innerText = '°F';
+                ui.lblUnitVisField.innerText = '°F';
+                ui.lblSliderCold.innerText = 'Cold (14°F)';
+                ui.lblSliderHot.innerText = 'Hot (122°F)';
+                ui.lblCoeffHint.innerText = 'Standard steel tape: 0.00000645 / °F';
+
+                // Update Presets labels
+                ui.btnPreset1.innerText = '41°F (Cold)';
+                ui.btnPreset2.innerText = '68°F (Base)';
+                ui.btnPreset3.innerText = '100°F (Hot)';
+
+                // Update Button Active States
+                ui.btnImperial.className = "px-2.5 py-1 text-[11px] font-bold rounded-md bg-sky-500/20 text-sky-400 transition-colors";
+                ui.btnMetric.className = "px-2.5 py-1 text-[11px] font-bold rounded-md text-slate-500 hover:text-slate-300 transition-colors bg-transparent";
+            }
+
+            calculate();
+        }
+
+        // --- 3. Presets & Resets ---
+        function setPreset(type) {
+            triggerHaptic(15);
+            if (isMetric) {
+                if (type === 'cold') ui.measuredInput.value = 5;
+                if (type === 'base') ui.measuredInput.value = 20;
+                if (type === 'hot') ui.measuredInput.value = 38;
+            } else {
+                if (type === 'cold') ui.measuredInput.value = 41;
+                if (type === 'base') ui.measuredInput.value = 68;
+                if (type === 'hot') ui.measuredInput.value = 100;
+            }
+            ui.measuredSlider.value = ui.measuredInput.value;
+            calculate();
+        }
+
+        function resetToDefaults() {
+            triggerHaptic(15);
+            if (isMetric) {
+                ui.nominal.value = 300;
+                ui.calib.value = 20;
+                ui.measuredInput.value = 32;
+                ui.coeff.value = 0.0000116;
+            } else {
+                ui.nominal.value = 1000.0;
+                ui.calib.value = 68;
+                ui.measuredInput.value = 90;
+                ui.coeff.value = 0.00000645;
+            }
+            ui.measuredSlider.value = ui.measuredInput.value;
+            calculate();
+            showToast("Parameters reset");
+        }
+
+        // --- 4. Haptics, Toasts & Event Bindings ---
+        function triggerHaptic(ms = 10) {
+            if (navigator.vibrate) navigator.vibrate(ms);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        // Bind Sync between Slider and Input for Measured Temp
+        ui.measuredSlider.addEventListener('input', (e) => {
+            ui.measuredInput.value = e.target.value;
+            calculate();
+        });
+        ui.measuredInput.addEventListener('input', (e) => {
+            ui.measuredSlider.value = e.target.value;
+            calculate();
+        });
+
+        // Bind re-calc to other inputs
+        ui.nominal.addEventListener('input', calculate);
+        
+        // Enforce minimum nominal length on blur so it doesn't interrupt typing
+        ui.nominal.addEventListener('blur', () => {
+            const minNominal = isMetric ? 0.01 : 0.0833;
+            let val = parseFloat(ui.nominal.value);
+            if (isNaN(val) || val < minNominal) {
+                ui.nominal.value = minNominal.toFixed(isMetric ? 2 : 4);
+                calculate();
+                showToast("Length adjusted to minimum allowed");
+            }
+        });
+
+        ui.calib.addEventListener('input', calculate);
+        ui.coeff.addEventListener('input', calculate);
+
+        // --- 5. Field Session Logging ---
+        // --- 5. Field Session Logging ---
+        function saveLogEntry() {
+            triggerHaptic(25);
+            const minNominal = isMetric ? 0.01 : 0.0833;
+            let rawNominal = parseFloat(ui.nominal.value);
+            const nominal = (isNaN(rawNominal) || rawNominal < minNominal) ? minNominal : rawNominal;
+            const calib = parseFloat(ui.calib.value) || 0;
+            const measured = parseFloat(ui.measuredInput.value) || 0;
+            const coeff = parseFloat(ui.coeff.value) || 0;
+            
+            const tempDiff = measured - calib;
+            const deltaL = nominal * coeff * tempDiff;
+            const trueLength = nominal + deltaL;
+            const correctionAmount = isMetric ? (deltaL * 1000) : (deltaL * 12);
+
+            const lenU = isMetric ? 'm' : 'ft';
+            const tempU = isMetric ? '°C' : '°F';
+            const corrU = isMetric ? 'mm' : 'in';
+
+            const entry = {
+                id: Date.now(),
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                fieldTemp: measured,
+                tempUnit: tempU,
+                nominal: nominal,
+                lenUnit: lenU,
+                trueLength: trueLength.toFixed(5),
+                corr: correctionAmount.toFixed(isMetric ? 2 : 3),
+                corrUnit: corrU
+            };
+
+            const logs = JSON.parse(localStorage.getItem('tape_field_logs') || '[]');
+            logs.unshift(entry);
+            localStorage.setItem('tape_field_logs', JSON.stringify(logs));
+            
+            renderLogs();
+            showToast(`Saved field log: ${entry.trueLength}${entry.lenUnit}`);
+        }
+
+        function deleteLogEntry(id) {
+            triggerHaptic(15);
+            let logs = JSON.parse(localStorage.getItem('tape_field_logs') || '[]');
+            logs = logs.filter(item => item.id !== id);
+            localStorage.setItem('tape_field_logs', JSON.stringify(logs));
+            renderLogs();
+        }
+
+        function renderLogs() {
+            const container = document.getElementById('logEntriesContainer');
+            const emptyMsg = document.getElementById('emptyLogMsg');
+            const logs = JSON.parse(localStorage.getItem('tape_field_logs') || '[]');
+
+            if (logs.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                container.innerHTML = '';
+                container.appendChild(emptyMsg);
+                return;
+            }
+
+            emptyMsg.classList.add('hidden');
+            container.innerHTML = logs.map(item => {
+                const isWarm = (item.tempUnit === '°C' && item.fieldTemp > 20) || (item.tempUnit === '°F' && item.fieldTemp > 68);
+                return `
+                <div class="flex items-center justify-between p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-white font-mono">${item.trueLength} ${item.lenUnit || 'm'}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded ${isWarm ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300'} font-semibold">${item.fieldTemp}${item.tempUnit || '°C'}</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 block mt-1">Nominal: ${item.nominal}${item.lenUnit || 'm'} | Corr: ${item.corr > 0 ? '+' : ''}${item.corr}${item.corrUnit || 'mm'} (${item.time})</span>
+                    </div>
+                    <button onclick="deleteLogEntry(${item.id})" class="p-1.5 text-slate-500 hover:text-red-400 transition" title="Delete Entry">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                </div>
+            `}).join('');
+            
+            // Re-append the empty message hidden, so it's always available in DOM
+            container.appendChild(emptyMsg); 
+        }
+
+        // --- 6. Exporting ---
+        function shareReport() {
+            triggerHaptic(15);
+            const minNominal = isMetric ? 0.01 : 0.0833;
+            let rawNominal = parseFloat(ui.nominal.value);
+            const nominal = (isNaN(rawNominal) || rawNominal < minNominal) ? minNominal : rawNominal;
+            const calib = parseFloat(ui.calib.value) || 0;
+            const measured = parseFloat(ui.measuredInput.value) || 0;
+            const coeff = parseFloat(ui.coeff.value) || 0;
+            
+            const tempDiff = measured - calib;
+            const deltaL = nominal * coeff * tempDiff;
+            const trueLength = nominal + deltaL;
+            const correctionAmount = isMetric ? (deltaL * 1000) : (deltaL * 12);
+            
+            const lenU = isMetric ? 'm' : 'ft';
+            const tempU = isMetric ? '°C' : '°F';
+            const corrU = isMetric ? 'mm' : 'in';
+
+            const reportText = `[Steel Tape Thermal Report]\nNominal Tape: ${nominal}${lenU}\nCalibration Temp: ${calib}${tempU}\nField Temp: ${measured}${tempU} (ΔT: ${tempDiff > 0 ? '+' : ''}${tempDiff.toFixed(1)}${tempU})\nCorrection: ${(correctionAmount > 0 ? '+' : '')}${correctionAmount.toFixed(isMetric ? 2 : 3)}${corrU}\nTrue Length: ${trueLength.toFixed(5)}${lenU}`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Steel Tape Thermal Report',
+                    text: reportText
+                }).catch(() => {});
+            } else {
+                // Clipboard fallback
+                const dummy = document.createElement('textarea');
+                document.body.appendChild(dummy);
+                dummy.value = reportText;
+                dummy.select();
+                document.execCommand('copy');
+                document.body.removeChild(dummy);
+                showToast("Report copied to clipboard!");
+            }
+        }
+
+        // --- 7. Initialization ---
+        window.onload = function() {
+            calculate();
+            renderLogs();
+        };
+
+    </script>
+</body>
+</html>

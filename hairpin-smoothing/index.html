@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<!-- 
+  File: turnaround_smoothing_simulator_2 (aka: turnaround_smoothing_simulator.html)
+  Last Modified: September 12, 2026
+  Version: 1.5.0
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Turnaround Smoothing Simulator</title>
+    
+    <!-- Native App Meta Tags (PWA & iOS) -->
+    <meta name="theme-color" content="#020617">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Turnaround">
+    
+    <!-- Embedded SVG App Icons -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22112%22%20fill%3D%22%230284c7%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dy%3D%22.35em%22%20fill%3D%22white%22%20font-family%3D%22sans-serif%22%20font-size%3D%22200%22%20font-weight%3D%22bold%22%20text-anchor%3D%22middle%22%3ET%2FS%3C%2Ftext%3E%3C%2Fsvg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%22112%22%20fill%3D%22%230284c7%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dy%3D%22.35em%22%20fill%3D%22white%22%20font-family%3D%22sans-serif%22%20font-size%3D%22200%22%20font-weight%3D%22bold%22%20text-anchor%3D%22middle%22%3ET%2FS%3C%2Ftext%3E%3C%2Fsvg%3E">
+    
+    <!-- Inline Web App Manifest for Android Chrome -->
+    <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Turnaround%20Smoothing%20Simulator%22%2C%22short_name%22%3A%22Turnaround%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23020617%22%2C%22theme_color%22%3A%22%23020617%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Bcharset%3Dutf-8%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520512%2520512%2522%253E%253Crect%2520width%253D%2522512%2522%2520height%253D%2522512%2522%2520rx%253D%2522112%2522%2520fill%253D%2522%25230284c7%2522%252F%253E%253Ctext%2520x%253D%252250%2525%2522%2520y%253D%252250%2525%2522%2520dy%253D%2522.35em%2522%2520fill%253D%2522white%2522%2520font-family%253D%2522sans-serif%2522%2520font-size%253D%2522200%2522%2520font-weight%253D%2522bold%2522%2520text-anchor%253D%2522middle%2522%253ET%252FS%253C%252Ftext%253E%253C%252Fsvg%253E%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22sizes%22%3A%22512x512%22%7D%5D%7D">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020617;
+            color: #f8fafc;
+        }
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-sky-500 selection:text-white">
+
+    <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-gradient-to-tr from-sky-600 to-indigo-500 rounded-xl shadow-lg shadow-sky-500/20 text-white font-black text-lg tracking-wider">
+                    T/S
+                </div>
+                <div>
+                    <h1 class="font-bold text-base sm:text-lg text-white leading-snug">Turnaround Smoothing Simulator</h1>
+                    <p class="text-xs text-slate-400">World Athletics Course Measurement & Calibration Protocol Visualizer</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                    <span class="w-2 h-2 rounded-full bg-sky-400 animate-pulse"></span>
+                    Calibrated Metric Engine
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Controls Panel -->
+            <div class="lg:col-span-4 flex flex-col gap-6">
+                
+                <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-xl space-y-6">
+                    <div>
+                        <h3 class="text-base font-bold text-white mb-1">Turn Parameters</h3>
+                        <p class="text-xs text-slate-400">Adjust the radius to calculate center offset and perimeter expansion.</p>
+                    </div>
+
+                    <!-- Unit Toggle -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Measurement Unit</label>
+                        <div class="flex rounded-lg overflow-hidden border border-slate-700 bg-slate-900 p-1">
+                            <button id="btnMetric" onclick="setUnit('metric')" class="flex-1 py-1.5 text-xs font-medium rounded-md bg-sky-600 text-white shadow-sm transition-all duration-200">
+                                Metric (m)
+                            </button>
+                            <button id="btnImperial" onclick="setUnit('imperial')" class="flex-1 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 transition-all duration-200">
+                                Imperial (ft)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Radius Input -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-end">
+                            <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Arc Radius (R)</label>
+                            <div class="relative">
+                                <input type="number" id="radiusInput" value="4" step="0.1" class="w-24 bg-slate-900 border border-slate-700 rounded-lg py-1.5 px-3 text-white text-right text-sm font-mono focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 transition-all" oninput="syncInputs(this.value, 'number')">
+                                <span class="absolute inset-y-0 right-3 flex items-center text-slate-400 text-xs pointer-events-none hidden" id="unitLabelNumber">m</span>
+                            </div>
+                        </div>
+                        <input type="range" id="radiusSlider" min="0.5" max="10" value="4" step="0.1" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500" oninput="syncInputs(this.value, 'slider')">
+                    </div>
+                </div>
+
+                <!-- Metrics Display -->
+                <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white flex items-center justify-between">
+                            <span>Computed Offsets</span>
+                        </h3>
+                        <p class="text-[11px] text-slate-400 mt-1">Based on a 30cm (0.984ft) measurement line offset.</p>
+                    </div>
+
+                    <div class="space-y-3">
+                        <!-- Offset B -->
+                        <div class="bg-slate-900/80 border border-emerald-500/30 rounded-xl p-4 space-y-1 relative overflow-hidden group hover:border-emerald-500/50 transition-colors">
+                            <div class="absolute right-0 top-0 w-16 h-16 bg-emerald-500/5 rounded-bl-full -z-10 group-hover:bg-emerald-500/10 transition-colors"></div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">Offset B (Center Setback)</span>
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                            </div>
+                            <div id="resultB" class="text-2xl sm:text-3xl font-bold text-white font-mono">6.75 m</div>
+                            <p class="text-[10px] text-slate-400">Distance from the original hairpin to the new center point.</p>
+                        </div>
+
+                        <!-- Offset A -->
+                        <div class="bg-slate-900/80 border border-sky-500/30 rounded-xl p-4 space-y-1 relative overflow-hidden group hover:border-sky-500/50 transition-colors">
+                            <div class="absolute right-0 top-0 w-16 h-16 bg-sky-500/5 rounded-bl-full -z-10 group-hover:bg-sky-500/10 transition-colors"></div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[11px] font-semibold text-sky-400 uppercase tracking-wider">Offset A (Perimeter Ext.)</span>
+                                <span class="w-2 h-2 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.8)]"></span>
+                            </div>
+                            <div id="resultA" class="text-2xl sm:text-3xl font-bold text-white font-mono">2.75 m</div>
+                            <p class="text-[10px] text-slate-400">Distance from the original hairpin to the newly laid cones.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Visualization Panel -->
+            <div class="lg:col-span-8 flex flex-col">
+                <div class="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-2xl flex-grow flex flex-col">
+                    
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-800/60 mb-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                                <span>Geometry Visualizer</span>
+                                <span class="text-xs bg-slate-800 text-slate-300 font-normal px-2.5 py-0.5 rounded-full border border-slate-700">Top-Down View</span>
+                            </h2>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button id="btn-copy-diagram" onclick="exportDiagram()" class="px-3 py-1.5 rounded-lg bg-white text-slate-900 hover:bg-slate-100 text-xs font-semibold transition flex items-center gap-1.5 shadow-md">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                <span>Copy Map Diagram</span>
+                            </button>
+                            <button id="btn-toggle-anim" onclick="toggleAnimation()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-md shadow-sky-600/20">
+                                <svg id="icon-play-pause" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                <span id="label-play-pause">Pause Runner</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Canvas Container -->
+                    <div class="relative w-full flex-grow min-h-[400px] rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shadow-inner group">
+                        <canvas id="simCanvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
+                        
+                        <!-- Canvas Overlay Legend -->
+                        <div class="absolute top-3 left-3 bg-slate-950/80 backdrop-blur border border-slate-800 rounded-lg p-2.5 text-[11px] space-y-1.5 shadow-lg">
+                            <div class="flex items-center gap-2">
+                                <div class="w-4 h-0 border-t-2 border-dashed border-white"></div>
+                                <span class="text-white font-bold">Original Hairpin</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3.5 h-1 bg-amber-400 rounded-full"></div>
+                                <span class="text-slate-300 font-medium">Smoothed Arc (Cones)</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3.5 h-1 bg-emerald-400 rounded-full"></div>
+                                <span class="text-slate-300 font-medium">Measurement Line (+30cm)</span>
+                            </div>
+                            <div class="text-[9.5px] text-slate-500 mt-1 italic">
+                                * Offset exaggerated 3x for visibility
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-slate-800/80 bg-slate-950 py-4 text-center text-xs text-slate-500 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <p>Course Measurement & Calibration Protocol Visualizer</p>
+            <p class="text-[11px]">Interactive Technical Engine</p>
+        </div>
+        <div class="mt-3 text-center">
+            <p class="text-xs text-slate-600 font-medium">Created by Justin Kuo</p>
+        </div>
+    </footer>
+
+    <script>
+        // State variables
+        let isMetric = true;
+        const RUNNER_OFFSET_METERS = 0.3;
+        const RUNNER_OFFSET_FEET = 0.984252;
+        
+        let canvas, ctx;
+        let animationFrameId = null;
+        let isAnimating = true;
+        let animProgress = 0; // 0 to 1 along the path
+
+        // Initialize
+        window.onload = function() {
+            canvas = document.getElementById('simCanvas');
+            ctx = canvas.getContext('2d');
+            window.addEventListener('resize', handleResize);
+            
+            handleResize();
+            calculateAndDraw();
+            startAnimation();
+        };
+
+        function setUnit(unit) {
+            isMetric = (unit === 'metric');
+            
+            const btnMetric = document.getElementById('btnMetric');
+            const btnImperial = document.getElementById('btnImperial');
+            const radiusSlider = document.getElementById('radiusSlider');
+            const radiusInput = document.getElementById('radiusInput');
+
+            if (isMetric) {
+                btnMetric.className = "flex-1 py-1.5 text-xs font-medium rounded-md bg-sky-600 text-white shadow-sm transition-all duration-200";
+                btnImperial.className = "flex-1 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 transition-all duration-200";
+                
+                // Convert current value to metric
+                let currentVal = parseFloat(radiusInput.value);
+                let newVal = (currentVal / 3.28084).toFixed(2);
+                radiusInput.value = newVal;
+                
+                radiusSlider.min = 0.5;
+                radiusSlider.max = 10;
+                radiusSlider.step = 0.1;
+                radiusSlider.value = newVal;
+            } else {
+                btnImperial.className = "flex-1 py-1.5 text-xs font-medium rounded-md bg-sky-600 text-white shadow-sm transition-all duration-200";
+                btnMetric.className = "flex-1 py-1.5 text-xs font-medium rounded-md text-slate-400 hover:text-slate-200 transition-all duration-200";
+                
+                // Convert current value to imperial
+                let currentVal = parseFloat(radiusInput.value);
+                let newVal = (currentVal * 3.28084).toFixed(2);
+                radiusInput.value = newVal;
+                
+                radiusSlider.min = 1.5;
+                radiusSlider.max = 33;
+                radiusSlider.step = 0.5;
+                radiusSlider.value = newVal;
+            }
+            calculateAndDraw();
+        }
+
+        function syncInputs(value, source) {
+            if (source === 'number') {
+                document.getElementById('radiusSlider').value = value;
+            } else {
+                document.getElementById('radiusInput').value = value;
+            }
+            calculateAndDraw();
+        }
+
+        function handleResize() {
+            if (!canvas) return;
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth * window.devicePixelRatio;
+            canvas.height = container.clientHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            // Draw immediately without waiting for animation frame
+            calculateAndDraw(true); 
+        }
+
+        function calculateAndDraw(skipDraw = false) {
+            const radius = parseFloat(document.getElementById('radiusInput').value) || 0;
+            const runnerOffset = isMetric ? RUNNER_OFFSET_METERS : RUNNER_OFFSET_FEET;
+            const unitStr = isMetric ? 'm' : 'ft';
+
+            // Formulas: 
+            // B = ((radius + offset) * PI) / 2
+            // A = (((radius + offset) * PI) / 2) - radius = B - radius
+            
+            const b = ((radius + runnerOffset) * Math.PI) / 2;
+            const a = b - radius;
+
+            // Update UI
+            document.getElementById('resultA').innerText = `${a.toFixed(2)} ${unitStr}`;
+            document.getElementById('resultB').innerText = `${b.toFixed(2)} ${unitStr}`;
+
+            if (!skipDraw) {
+                // If animating, the loop handles drawing. If paused, force a draw.
+                if (!isAnimating) {
+                    drawCanvas(radius, a, b, runnerOffset, unitStr, ctx, 'dark');
+                }
+            }
+        }
+
+        function drawCanvas(radius, a, b, runnerOffset, unitStr, targetCtx, theme = 'dark') {
+            if (!targetCtx || !canvas) return;
+            
+            const isDark = theme === 'dark';
+            
+            // Color Palette based on theme
+            const colors = {
+                bg: isDark ? null : '#ffffff',
+                grid: isDark ? '#1e293b' : '#f1f5f9',
+                path: isDark ? '#fbbf24' : '#d97706',       // Amber -> darker orange
+                cone: isDark ? '#f97316' : '#ea580c',
+                measure: isDark ? '#34d399' : '#059669',    // Emerald -> darker green
+                original: isDark ? '#ffffff' : '#0f172a',   // White -> near black
+                text: isDark ? '#f8fafc' : '#0f172a',
+                dimLine: isDark ? '#94a3b8' : '#64748b',
+                highlightB: isDark ? '#38bdf8' : '#0284c7', // Sky -> darker blue
+                highlightA: isDark ? '#a78bfa' : '#6d28d9', // Violet -> darker purple
+                runnerGlow: isDark ? '#10b981' : '#059669'
+            };
+
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+
+            if (colors.bg) {
+                targetCtx.fillStyle = colors.bg;
+                targetCtx.fillRect(0, 0, width, height);
+            } else {
+                targetCtx.clearRect(0, 0, width, height);
+            }
+
+            // Exaggerate offset visually so cones and measurement line don't overlap completely at large scales
+            const VISUAL_EXAGGERATION = 3; 
+            const visualRunnerOffset = runnerOffset * VISUAL_EXAGGERATION;
+
+            // 1. Draw Technical Background Grid
+            targetCtx.strokeStyle = colors.grid; 
+            targetCtx.lineWidth = 1;
+            const gridSpacing = 40;
+            for (let x = 0; x < width; x += gridSpacing) {
+                targetCtx.beginPath(); targetCtx.moveTo(x, 0); targetCtx.lineTo(x, height); targetCtx.stroke();
+            }
+            for (let y = 0; y < height; y += gridSpacing) {
+                targetCtx.beginPath(); targetCtx.moveTo(0, y); targetCtx.lineTo(width, y); targetCtx.stroke();
+            }
+
+            // 2. Setup Coordinate System
+            const maxRadiusMetric = 10; 
+            const maxBMetric = ((maxRadiusMetric + RUNNER_OFFSET_METERS * VISUAL_EXAGGERATION) * Math.PI) / 2;
+            const expectedMaxExtent = (maxRadiusMetric + maxBMetric) * 1.5; 
+            
+            const normalizedRadius = isMetric ? radius : radius / 3.28084;
+            const scale = Math.min(width, height) / expectedMaxExtent; 
+
+            // Center points
+            const centerX = width / 2;
+            const centerY = height / 2;
+
+            const normalizedVisualOffset = isMetric ? visualRunnerOffset : visualRunnerOffset / 3.28084;
+            
+            const scaledRadius = normalizedRadius * scale;
+            const scaledRunnerPathRadius = (normalizedRadius + normalizedVisualOffset) * scale;
+            
+            const visualB = ((normalizedRadius + normalizedVisualOffset) * Math.PI) / 2;
+            const visualA = visualB - normalizedRadius;
+            
+            const scaledB = visualB * scale;
+            const scaledA = visualA * scale;
+
+            // Positions
+            const hairpinX = centerX + scaledB;
+            const roadTopY = centerY - scaledRadius;
+            const roadBottomY = centerY + scaledRadius;
+            const roadLength = width / 2; 
+
+            // 3. Draw Smoothed Turn (Amber path)
+            targetCtx.beginPath();
+            targetCtx.moveTo(centerX - roadLength, roadTopY);
+            targetCtx.lineTo(centerX, roadTopY);
+            targetCtx.arc(centerX, centerY, scaledRadius, -Math.PI/2, Math.PI/2, false);
+            targetCtx.lineTo(centerX - roadLength, roadBottomY);
+            targetCtx.strokeStyle = colors.path; 
+            targetCtx.lineWidth = 3;
+            targetCtx.lineCap = 'round';
+            targetCtx.lineJoin = 'round';
+            targetCtx.stroke();
+
+            // 3.5 Draw Cones along the arc only
+            const coneSize = Math.max(3, 4 * (scale / 40));
+            
+            const numArcCones = Math.max(8, Math.floor(scaledRadius * Math.PI / 30));
+            for (let i = 0; i <= numArcCones; i++) {
+                const angle = -Math.PI/2 + (i / numArcCones) * Math.PI;
+                drawCone(targetCtx, centerX + scaledRadius * Math.cos(angle), centerY + scaledRadius * Math.sin(angle), coneSize, colors);
+            }
+
+            // 4. Draw Measurement Line (Emerald Green)
+            targetCtx.beginPath();
+            targetCtx.moveTo(centerX - roadLength, roadTopY - (normalizedVisualOffset * scale));
+            targetCtx.lineTo(centerX, roadTopY - (normalizedVisualOffset * scale));
+            targetCtx.arc(centerX, centerY, scaledRunnerPathRadius, -Math.PI/2, Math.PI/2, false);
+            targetCtx.lineTo(centerX - roadLength, roadBottomY + (normalizedVisualOffset * scale));
+            targetCtx.strokeStyle = colors.measure; 
+            targetCtx.lineWidth = 2;
+            targetCtx.stroke();
+
+            // 5. Draw Original Hairpin
+            const runnerOffsetScaled = normalizedVisualOffset * scale;
+            
+            targetCtx.beginPath();
+            targetCtx.arc(hairpinX, centerY, 5, 0, Math.PI * 2);
+            targetCtx.fillStyle = colors.original; 
+            targetCtx.fill();
+            
+            if (isDark) {
+                targetCtx.beginPath();
+                targetCtx.arc(hairpinX, centerY, 9, 0, Math.PI * 2);
+                targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                targetCtx.lineWidth = 1;
+                targetCtx.stroke();
+            }
+
+            targetCtx.beginPath();
+            targetCtx.moveTo(centerX - roadLength, centerY - runnerOffsetScaled);
+            targetCtx.lineTo(hairpinX, centerY - runnerOffsetScaled);
+            targetCtx.arc(hairpinX, centerY, runnerOffsetScaled, -Math.PI/2, Math.PI/2, false);
+            targetCtx.lineTo(centerX - roadLength, centerY + runnerOffsetScaled);
+            
+            targetCtx.strokeStyle = colors.original; 
+            targetCtx.lineWidth = 2.5;
+            targetCtx.setLineDash([6, 6]);
+            targetCtx.stroke();
+            targetCtx.setLineDash([]); 
+
+            // 6. Draw Animated Measurement Point (Skip on export)
+            if (isAnimating && isDark) {
+                drawAnimatedRunner(targetCtx, centerX, centerY, scaledRunnerPathRadius, roadTopY, roadBottomY, roadLength, runnerOffsetScaled, colors);
+            }
+
+            // 7. Dimension Lines and Labels
+            targetCtx.font = '12px Inter, monospace';
+            targetCtx.textAlign = 'center';
+            targetCtx.textBaseline = 'middle';
+
+            // Center Point Marker
+            targetCtx.beginPath();
+            targetCtx.arc(centerX, centerY, 4, 0, Math.PI*2);
+            targetCtx.fillStyle = colors.highlightB;
+            targetCtx.fill();
+            
+            // Radius R
+            targetCtx.beginPath();
+            targetCtx.moveTo(centerX, centerY);
+            const rEndX = centerX + scaledRadius * Math.cos(-Math.PI/4);
+            const rEndY = centerY + scaledRadius * Math.sin(-Math.PI/4);
+            targetCtx.lineTo(rEndX, rEndY);
+            targetCtx.strokeStyle = colors.dimLine;
+            targetCtx.lineWidth = 1;
+            targetCtx.stroke();
+            
+            drawArrowHead(targetCtx, centerX, centerY, rEndX, rEndY, 6, colors.dimLine);
+            
+            targetCtx.fillStyle = colors.text; 
+            targetCtx.fillText(`R=${radius}${unitStr}`, centerX + (scaledRadius/2) * Math.cos(-Math.PI/4) - 15, centerY + (scaledRadius/2) * Math.sin(-Math.PI/4) - 10);
+
+            // Offset B Dimension
+            const dimY_B = centerY + scaledRunnerPathRadius + 40;
+            targetCtx.beginPath();
+            targetCtx.moveTo(centerX, dimY_B);
+            targetCtx.lineTo(hairpinX, dimY_B);
+            targetCtx.strokeStyle = colors.highlightB;
+            targetCtx.lineWidth = 1.5;
+            targetCtx.stroke();
+            
+            targetCtx.beginPath();
+            targetCtx.moveTo(centerX, centerY + 10); targetCtx.lineTo(centerX, dimY_B + 10);
+            targetCtx.moveTo(hairpinX, centerY + 10); targetCtx.lineTo(hairpinX, dimY_B + 10);
+            targetCtx.strokeStyle = colors.dimLine;
+            targetCtx.lineWidth = 1;
+            targetCtx.stroke();
+            
+            targetCtx.fillStyle = colors.highlightB;
+            targetCtx.fillText(`B = ${b.toFixed(2)}${unitStr}`, centerX + (scaledB / 2), dimY_B - 12);
+
+            // Offset A Dimension
+            const dimY_A = centerY - scaledRunnerPathRadius - 30;
+            const perimX = centerX + scaledRadius;
+            targetCtx.beginPath();
+            targetCtx.moveTo(perimX, dimY_A);
+            targetCtx.lineTo(hairpinX, dimY_A);
+            targetCtx.strokeStyle = colors.highlightA; 
+            targetCtx.lineWidth = 1.5;
+            targetCtx.stroke();
+            
+            targetCtx.beginPath();
+            targetCtx.moveTo(perimX, centerY - 10); targetCtx.lineTo(perimX, dimY_A - 10);
+            targetCtx.moveTo(hairpinX, centerY - 10); targetCtx.lineTo(hairpinX, dimY_A - 10);
+            targetCtx.strokeStyle = colors.dimLine;
+            targetCtx.stroke();
+
+            targetCtx.fillStyle = colors.highlightA;
+            targetCtx.fillText(`A = ${a.toFixed(2)}${unitStr}`, perimX + (scaledA / 2), dimY_A - 12);
+
+            // 8. Draw Legend on Export
+            if (!isDark) {
+                drawLegend(targetCtx, colors);
+            }
+        }
+
+        function drawArrowHead(targetCtx, fromX, fromY, toX, toY, radius, color) {
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+            targetCtx.beginPath();
+            targetCtx.moveTo(toX, toY);
+            targetCtx.lineTo(toX - radius * Math.cos(angle - Math.PI / 6), toY - radius * Math.sin(angle - Math.PI / 6));
+            targetCtx.lineTo(toX - radius * Math.cos(angle + Math.PI / 6), toY - radius * Math.sin(angle + Math.PI / 6));
+            targetCtx.lineTo(toX, toY);
+            targetCtx.fillStyle = color;
+            targetCtx.fill();
+        }
+
+        function drawCone(targetCtx, x, y, size, colors) {
+            targetCtx.beginPath();
+            targetCtx.arc(x, y, size, 0, Math.PI * 2);
+            targetCtx.fillStyle = colors.cone; 
+            targetCtx.fill();
+            targetCtx.strokeStyle = colors.bg ? colors.bg : '#ffffff';
+            targetCtx.lineWidth = 1;
+            targetCtx.stroke();
+            targetCtx.beginPath();
+            targetCtx.arc(x, y, size * 0.4, 0, Math.PI * 2);
+            targetCtx.fillStyle = colors.bg ? colors.bg : '#ffffff';
+            targetCtx.fill();
+        }
+
+        function drawLegend(targetCtx, colors) {
+            targetCtx.save();
+            targetCtx.translate(15, 15);
+            
+            // Background Box
+            targetCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+            targetCtx.strokeStyle = '#e2e8f0';
+            targetCtx.lineWidth = 1;
+            
+            if(targetCtx.roundRect) {
+                targetCtx.beginPath();
+                targetCtx.roundRect(0, 0, 210, 90, 8);
+                targetCtx.fill();
+                targetCtx.stroke();
+            } else {
+                targetCtx.fillRect(0,0, 210, 90);
+                targetCtx.strokeRect(0,0, 210, 90);
+            }
+
+            targetCtx.font = 'bold 12px Inter, sans-serif';
+            targetCtx.textAlign = 'left';
+            targetCtx.textBaseline = 'middle';
+            
+            // Original Hairpin
+            targetCtx.strokeStyle = colors.original;
+            targetCtx.lineWidth = 2;
+            targetCtx.setLineDash([4, 4]);
+            targetCtx.beginPath(); targetCtx.moveTo(15, 22); targetCtx.lineTo(35, 22); targetCtx.stroke();
+            targetCtx.setLineDash([]);
+            targetCtx.fillStyle = colors.text;
+            targetCtx.fillText("Original Hairpin", 45, 22);
+            
+            // Smoothed Arc
+            targetCtx.strokeStyle = colors.path;
+            targetCtx.lineWidth = 3;
+            targetCtx.beginPath(); targetCtx.moveTo(15, 45); targetCtx.lineTo(35, 45); targetCtx.stroke();
+            targetCtx.fillText("Smoothed Arc (Cones)", 45, 45);
+            
+            // Measurement Line
+            targetCtx.strokeStyle = colors.measure;
+            targetCtx.lineWidth = 2;
+            targetCtx.beginPath(); targetCtx.moveTo(15, 68); targetCtx.lineTo(35, 68); targetCtx.stroke();
+            targetCtx.fillText("Measurement Line (+30cm)", 45, 68);
+            
+            targetCtx.restore();
+        }
+
+        function drawAnimatedRunner(targetCtx, centerX, centerY, scaledRunnerPathRadius, roadTopY, roadBottomY, roadLength, runnerOffsetScaled, colors) {
+            const topY = roadTopY - runnerOffsetScaled;
+            const bottomY = roadBottomY + runnerOffsetScaled;
+            const arcLength = Math.PI * scaledRunnerPathRadius;
+            const totalPathLength = roadLength + arcLength + roadLength;
+            const currentDist = animProgress * totalPathLength;
+            
+            let runnerX, runnerY;
+
+            if (currentDist < roadLength) {
+                runnerX = (centerX - roadLength) + currentDist;
+                runnerY = bottomY;
+            } else if (currentDist < roadLength + arcLength) {
+                const arcDist = currentDist - roadLength;
+                const angle = Math.PI/2 - (arcDist / scaledRunnerPathRadius);
+                runnerX = centerX + scaledRunnerPathRadius * Math.cos(angle);
+                runnerY = centerY + scaledRunnerPathRadius * Math.sin(angle);
+            } else {
+                const outDist = currentDist - (roadLength + arcLength);
+                runnerX = centerX - outDist;
+                runnerY = topY;
+            }
+
+            targetCtx.save();
+            targetCtx.shadowColor = colors.runnerGlow;
+            targetCtx.shadowBlur = 15;
+            targetCtx.fillStyle = '#ffffff';
+            targetCtx.beginPath();
+            targetCtx.arc(runnerX, runnerY, 6, 0, Math.PI * 2);
+            targetCtx.fill();
+            targetCtx.strokeStyle = colors.runnerGlow; 
+            targetCtx.lineWidth = 2;
+            targetCtx.stroke();
+            targetCtx.restore();
+        }
+
+        function toggleAnimation() {
+            isAnimating = !isAnimating;
+            const btnLabel = document.getElementById('label-play-pause');
+            const btnIcon = document.getElementById('icon-play-pause');
+
+            if (isAnimating) {
+                btnLabel.innerText = "Pause Runner";
+                btnIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>`;
+                startAnimation();
+            } else {
+                btnLabel.innerText = "Resume Runner";
+                btnIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>`;
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                
+                const radius = parseFloat(document.getElementById('radiusInput').value) || 0;
+                const runnerOffset = isMetric ? RUNNER_OFFSET_METERS : RUNNER_OFFSET_FEET;
+                const b = ((radius + runnerOffset) * Math.PI) / 2;
+                const a = b - radius;
+                const unitStr = isMetric ? 'm' : 'ft';
+                drawCanvas(radius, a, b, runnerOffset, unitStr, ctx, 'dark');
+            }
+        }
+
+        function startAnimation() {
+            function loop() {
+                if (isAnimating) {
+                    animProgress += 0.005; // Speed of runner
+                    if (animProgress > 1) animProgress = 0;
+                    
+                    const radius = parseFloat(document.getElementById('radiusInput').value) || 0;
+                    const runnerOffset = isMetric ? RUNNER_OFFSET_METERS : RUNNER_OFFSET_FEET;
+                    const b = ((radius + runnerOffset) * Math.PI) / 2;
+                    const a = b - radius;
+                    const unitStr = isMetric ? 'm' : 'ft';
+                    
+                    drawCanvas(radius, a, b, runnerOffset, unitStr, ctx, 'dark');
+                    animationFrameId = requestAnimationFrame(loop);
+                }
+            }
+            if(animationFrameId) cancelAnimationFrame(animationFrameId);
+            loop();
+        }
+
+        async function exportDiagram() {
+            const btn = document.getElementById('btn-copy-diagram');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg><span class="animate-pulse">Copying...</span>`;
+            
+            try {
+                // 1. Create a high-res offscreen canvas
+                const exportCanvas = document.createElement('canvas');
+                const scaleMult = 2; // Export at 2x resolution for sharpness
+                exportCanvas.width = canvas.clientWidth * scaleMult;
+                exportCanvas.height = canvas.clientHeight * scaleMult;
+                
+                const exportCtx = exportCanvas.getContext('2d');
+                exportCtx.scale(scaleMult, scaleMult);
+                
+                // 2. Run draw function using light theme
+                const radius = parseFloat(document.getElementById('radiusInput').value) || 0;
+                const runnerOffset = isMetric ? RUNNER_OFFSET_METERS : RUNNER_OFFSET_FEET;
+                const b = ((radius + runnerOffset) * Math.PI) / 2;
+                const a = b - radius;
+                const unitStr = isMetric ? 'm' : 'ft';
+                
+                // Make sure to pass logical dimensions to match layout via mocking canvas properties 
+                // in drawCanvas width = canvas.clientWidth is used, which correctly maps to the screen layout.
+                const wasAnimating = isAnimating;
+                isAnimating = false; // Freeze runner
+                drawCanvas(radius, a, b, runnerOffset, unitStr, exportCtx, 'light');
+                isAnimating = wasAnimating;
+                
+                // 3. Convert to blob and copy/download
+                exportCanvas.toBlob(async (blob) => {
+                    try {
+                        const item = new ClipboardItem({ 'image/png': blob });
+                        await navigator.clipboard.write([item]);
+                        btn.innerHTML = `<svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><span class="text-emerald-700">Copied!</span>`;
+                    } catch (err) {
+                        console.warn('Clipboard write failed, falling back to download:', err);
+                        const url = URL.createObjectURL(blob);
+                        const aLink = document.createElement('a');
+                        aLink.href = url;
+                        aLink.download = `turnaround_R${radius}_${unitStr}.png`;
+                        aLink.click();
+                        URL.revokeObjectURL(url);
+                        btn.innerHTML = `<svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg><span class="text-emerald-700">Downloaded</span>`;
+                    }
+                    setTimeout(() => btn.innerHTML = originalText, 2500);
+                }, 'image/png');
+                
+            } catch (err) {
+                console.error("Export error:", err);
+                btn.innerHTML = `<span class="text-red-500">Error</span>`;
+                setTimeout(() => btn.innerHTML = originalText, 2000);
+            }
+        }
+    </script>
+</body>
+</html>
