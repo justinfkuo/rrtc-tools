@@ -1,0 +1,1089 @@
+﻿<!-- 
+  File Name: index.html
+  Last Edited: October 5, 2026
+  Version: 1.2.7    
+  Description: A web-based interactive map application for visualizing and simulating USATF/RRTC certified running courses. It allows users to upload KML route files, preview race paths, track distances, view waypoints, and simulate a runner's progress across various background map layers.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>USATF/RRTC Course Simulator</title>
+
+    <script>
+        // Polyfill window.top and window.parent access for sandboxed / cross-origin iframes
+        try {
+            try { 
+                var _testTop = window.top.location.href; 
+            } catch (e) {
+                Object.defineProperty(window, 'top', { get: function() { return window; } });
+            }
+            try { 
+                var _testParent = window.parent.location.href; 
+            } catch (e) {
+                Object.defineProperty(window, 'parent', { get: function() { return window; } });
+            }
+        } catch (e) {
+            console.warn('Iframe polyfill error:', e);
+        }
+    </script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.20/leaflet-maplibre-gl.js"></script>
+    <script>
+        // Compatibility fix for MapLibre GL v3+ with leaflet-maplibre-gl
+        if (typeof maplibregl !== 'undefined' && maplibregl.Map) {
+            if (!('_actualCanvas' in maplibregl.Map.prototype)) {
+                Object.defineProperty(maplibregl.Map.prototype, '_actualCanvas', {
+                    get: function() {
+                        return this.getCanvas ? this.getCanvas() : (this._canvas || null);
+                    },
+                    configurable: true
+                });
+            }
+        }
+
+        // Fix for "Cannot read properties of undefined (reading 'transform')" during Leaflet pan/animations
+        if (typeof L !== 'undefined' && L.MaplibreGL) {
+            var origTransformGL = L.MaplibreGL.prototype._transformGL;
+            if (origTransformGL) {
+                L.MaplibreGL.prototype._transformGL = function() {
+                    if (!this || !this._glMap) return;
+                    try {
+                        return origTransformGL.apply(this, arguments);
+                    } catch (e) {
+                        // Suppress transient frame errors during rapid camera panning
+                    }
+                };
+            }
+            var origUpdateGL = L.MaplibreGL.prototype._update;
+            if (origUpdateGL) {
+                L.MaplibreGL.prototype._update = function() {
+                    if (!this || !this._glMap) return;
+                    try {
+                        return origUpdateGL.apply(this, arguments);
+                    } catch (e) {}
+                };
+            }
+        }
+    </script>
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #map { 
+            height: 100%; 
+            width: 100%; 
+            z-index: 1;
+        }
+
+        /* B.A.A. Brand Colors */
+        .baa-blue-bg { background-color: #0032A0; }
+        .baa-blue-text { color: #0032A0; }
+        .baa-yellow-bg { background-color: #FFD100; }
+        .baa-yellow-text { color: #FFD100; }
+
+        /* Custom Runner Marker Styling */
+        .runner-icon {
+            background-color: #FFD100;
+            border: 3px solid #0032A0;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: transform 0.1s linear;
+            pointer-events: none !important;
+        }
+
+        .custom-waypoint-icon {
+            width: auto !important;
+            height: auto !important;
+            pointer-events: auto !important;
+        }
+
+        /* Smooth Mobile Drawer Slide Transition */
+        .drawer-transition {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Glassmorphism Effect for Floating HUD */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+
+        /* Waypoint Label Toggle Class */
+        .hide-waypoint-labels .waypoint-label-text {
+            display: none !important;
+        }
+
+        /* Tooltip & Popup text wrapping & interactivity overrides */
+        .leaflet-tooltip, .leaflet-popup-content-wrapper {
+            white-space: normal !important; 
+            pointer-events: auto !important; /* Allow interaction with tooltip/popup */
+            width: max-content;
+            max-width: 320px !important;
+        }
+
+        /* Bridge mouse gap between marker and tooltip so hover is not lost */
+        .leaflet-tooltip {
+            margin-top: -6px !important;
+            padding: 0 !important;
+            border: none !important;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
+        /* Ensure tooltip stays above other elements and allows clicks inside */
+        .leaflet-tooltip-pane {
+            z-index: 650;
+        }
+
+        .leaflet-tooltip::before {
+            display: none; /* Hide default leaflet sharp tooltip triangle pointer */
+        }
+
+        .custom-placemark-popup .leaflet-popup-content {
+            margin: 0 !important;
+            line-height: inherit;
+        }
+
+        /* Dynamic Tooltip Visibility Logic */
+        .tooltip-dynamic-name {
+            display: none; /* Hidden by default when labels are ON */
+        }
+        .hide-waypoint-labels .tooltip-dynamic-name {
+            display: block; /* Show name inside tooltip when map labels are OFF */
+        }
+        #map:not(.hide-waypoint-labels) .no-desc-tooltip {
+            display: none !important; /* Hide empty tooltips completely if labels are ON */
+            opacity: 0 !important;
+            visibility: hidden !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col h-[100dvh] w-screen overflow-hidden select-none">
+
+    <header class="baa-blue-bg text-white px-4 py-3 shadow-md h-14 flex items-center justify-between z-20 shrink-0">
+        <div class="flex items-center space-x-2">
+            <svg class="w-7 h-7 baa-yellow-text" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+            </svg>
+            <h1 class="text-base sm:text-lg font-bold baa-yellow-text truncate">USATF/RRTC Course Simulator</h1>
+        </div>
+
+        <!-- Desktop File Upload Button -->
+        <div class="hidden md:flex items-center bg-white/10 px-3 py-1 rounded-lg border border-white/20">
+            <label for="kmlInputDesktop" class="text-xs font-semibold cursor-pointer mr-2 text-white">Upload KML:</label>
+            <input type="file" id="kmlInputDesktop" accept=".kml" class="text-xs text-white w-44 file:mr-2 file:py-0.5 file:px-2 file:border-0 file:text-xs file:font-semibold file:bg-yellow-400 file:text-blue-900 hover:file:bg-yellow-500 cursor-pointer">
+        </div>
+    </header>
+
+    <main class="flex-1 relative flex flex-col md:flex-row overflow-hidden">
+
+        <div id="mobileHud" class="absolute top-3 left-3 right-3 z-10 md:hidden glass-panel rounded-xl p-2.5 shadow-lg border border-white/40 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <button id="hudPlayBtn" onclick="togglePlayPause()" class="baa-yellow-bg text-blue-950 p-2 rounded-lg font-bold shadow active:scale-95 transition">
+                    <svg id="hudPlayIcon" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    <svg id="hudPauseIcon" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5 0a1 1 0 012 0v4a1 1 0 11-2 0V8z" clip-rule="evenodd"></path></svg>
+                </button>
+                <div class="pl-1">
+                    <div class="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest leading-none mb-0.5">Distance</div>
+                    <div id="hudDistance" class="text-lg font-black text-[#0032A0] leading-none">0.00 <span class="text-sm font-bold">km</span></div>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+                <button onclick="toggleFollowFromHud()" id="hudFollowBtn" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-sm active:scale-95">
+                    桃 Following
+                </button>
+                <button onclick="toggleDrawer()" class="bg-gray-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow active:scale-95 flex items-center space-x-1">
+                    <span>笞呻ｸOptions</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="map" class="flex-1 z-0"></div>
+
+        <aside id="sidebar" class="absolute md:relative bottom-0 left-0 right-0 md:top-0 w-full md:w-80 max-h-[85dvh] md:max-h-full bg-white rounded-t-2xl md:rounded-none shadow-[0_-5px_25px_rgba(0,0,0,0.15)] md:shadow-[4px_0_15px_rgba(0,0,0,0.1)] z-20 flex flex-col drawer-transition translate-y-full md:translate-y-0">
+            
+            <!-- Mobile Drawer Drag Handle -->
+            <div onclick="toggleDrawer()" class="md:hidden w-full py-2.5 flex flex-col items-center justify-center cursor-pointer border-b border-gray-100 bg-gray-50 rounded-t-2xl">
+                <div class="w-12 h-1.5 bg-gray-300 rounded-full mb-1"></div>
+                <span class="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Simulation Controls</span>
+            </div>
+
+            <div class="p-4 sm:p-5 overflow-y-auto flex-1 space-y-5">
+
+                <!-- Error Message Box -->
+                <div id="errorBox" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded text-xs">
+                    <p class="font-bold">Notice</p>
+                    <p id="errorMessage"></p>
+                </div>
+
+                <!-- Distance Units -->
+                <div>
+                    <h2 class="text-xs uppercase tracking-wider font-extrabold text-gray-400 mb-2">Distance Units</h2>
+                    <div class="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl border border-gray-200">
+                        <label class="flex items-center justify-center py-1.5 rounded-lg cursor-pointer text-xs font-bold text-gray-700 has-[:checked]:bg-white has-[:checked]:text-blue-900 has-[:checked]:shadow-sm transition">
+                            <input type="radio" name="units" value="km" class="sr-only" checked onchange="updateDisplay()">
+                            Kilometers (km)
+                        </label>
+                        <label class="flex items-center justify-center py-1.5 rounded-lg cursor-pointer text-xs font-bold text-gray-700 has-[:checked]:bg-white has-[:checked]:text-blue-900 has-[:checked]:shadow-sm transition">
+                            <input type="radio" name="units" value="mi" class="sr-only" onchange="updateDisplay()">
+                            Miles (mi)
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Map Layer Selector -->
+                <div>
+                    <h2 class="text-xs uppercase tracking-wider font-extrabold text-gray-400 mb-2">Map Background</h2>
+                    <select id="mapLayerSelect" class="w-full p-2 border border-gray-300 rounded-lg text-xs font-semibold bg-white cursor-pointer focus:ring-2 focus:ring-blue-500 shadow-sm" onchange="changeMapLayer(this.value)">
+                        <option value="esri_street" selected>ArcGIS Street Map (Esri World_Street_Map)</option>
+                        <option value="esri_satellite">ArcGIS Satellite (Imagery) (Esri World_Imagery)</option>
+                        <option value="esri_topo">ArcGIS Topo Map (Esri World_Topo_Map)</option>
+                        <option value="osm">OpenStreetMap (Standard OSM)</option>
+                        <option value="ofm_liberty">OpenFreeMap Liberty (Vector)</option>
+                        <option value="open_topo">OpenTopoMap (Hills & Terrain)</option>
+                        <option value="carto_light">CARTO Positron (Light Vector Look)</option>
+                        <option value="ofm_positron">OpenFreeMap Positron (Vector)</option>
+                        <option value="carto_dark">Dark Mode (High Contrast) (CARTO dark_all)</option>
+                    </select>
+                </div>
+
+                <!-- Course Markers -->
+                <div>
+                    <h2 class="text-xs uppercase tracking-wider font-extrabold text-gray-400 mb-2">Course Markers</h2>
+                    <div class="space-y-2 bg-gray-50 p-3 rounded-xl border border-gray-200 text-xs font-medium text-gray-700">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggleKm" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" onchange="toggleMarkers()">
+                            <span class="ml-2">Show Kilometer Markers</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggleMi" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" onchange="toggleMarkers()" checked>
+                            <span class="ml-2">Show Mile Markers</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggleArrows" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" onchange="toggleMarkers()" checked>
+                            <span class="ml-2">Show Directional Arrows</span>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggleWaypointLabels" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" onchange="toggleMarkers()" checked>
+                            <span class="ml-2">Show Waypoint Labels</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Simulation Buttons & Controls -->
+                <div>
+                    <h2 class="text-xs uppercase tracking-wider font-extrabold text-gray-400 mb-2">Simulation Controls</h2>
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <button id="btnPlay" class="bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-bold py-2 px-2 rounded-lg shadow text-xs transition" onclick="startSimulation()">Play</button>
+                        <button id="btnPause" class="bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold py-2 px-2 rounded-lg shadow text-xs transition disabled:opacity-40 disabled:cursor-not-allowed" onclick="pauseSimulation()" disabled>Pause</button>
+                        <button id="btnReset" class="bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white font-bold py-2 px-2 rounded-lg shadow text-xs transition" onclick="resetSimulation()">Reset</button>
+                    </div>
+
+                    <!-- Follow Runner Switch -->
+                    <div class="flex items-center justify-between bg-gray-50 p-2.5 rounded-xl border border-gray-200 mb-3">
+                        <span class="text-xs font-bold text-gray-700">Follow Runner Camera:</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="followToggle" class="sr-only peer" checked onchange="toggleFollow()">
+                            <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
+
+                    <!-- Speed Slider -->
+                    <div class="bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="text-xs font-bold text-gray-700">Playback Speed:</label>
+                            <span class="text-[10px] font-black bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full"><span id="speedVal">15</span>x</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="1" max="100" value="15" class="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer" oninput="document.getElementById('speedVal').innerText = this.value">
+                    </div>
+                </div>
+
+                <!-- Mobile File Upload Input -->
+                <div class="md:hidden bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Upload KML Route:</label>
+                    <input type="file" id="kmlInputMobile" accept=".kml" class="text-xs text-gray-600 w-full file:mr-2 file:py-1 file:px-3 file:border-0 file:text-xs file:font-semibold file:bg-yellow-400 file:text-blue-950 file:rounded-lg">
+                </div>
+
+                <!-- Live Stats Panel -->
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl border border-blue-100 shadow-inner mb-4">
+                    <h3 class="text-xs uppercase tracking-wider font-extrabold text-blue-900 mb-2 flex items-center">
+                        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Live Statistics
+                    </h3>
+                    
+                    <div class="flex justify-between items-baseline mb-1">
+                        <span class="text-xs font-medium text-gray-600">Distance Completed:</span>
+                        <span id="statDistance" class="text-xl font-black text-blue-950">0.00</span>
+                    </div>
+                    
+                    <div class="flex justify-between items-baseline mb-3">
+                        <span class="text-xs font-medium text-gray-500">Distance Remaining:</span>
+                        <span id="statRemaining" class="text-sm font-bold text-gray-700">0.00</span>
+                    </div>
+                    
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden shadow-inner mb-1">
+                        <div id="progressBar" class="baa-yellow-bg h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+                    </div>
+                    <div class="text-right">
+                        <span id="statProgress" class="text-[10px] font-bold text-gray-500">0%</span>
+                    </div>
+                </div>
+                
+                <!-- Version Info -->
+                <div class="text-center pt-2 pb-8 md:pb-4">
+                    <span class="text-[10px] font-semibold text-gray-400 tracking-wider">Simulator v1.2.7</span>
+                </div>
+
+            </div>
+        </aside>
+
+    </main>
+
+    <script id="defaultKmlData" type="application/xml">
+<!-- PASTE_YOUR_KML_CONTENT_HERE -->
+    </script>
+
+    <script>
+        
+        // Initialize Leaflet Map centered on Franklin Park / Boston Emerald Necklace
+        const map = L.map('map', {
+            zoomControl: false
+        }).setView([42.302, -71.093], 14); 
+        
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        // Tile Layer Definitions
+        const esriStreetLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 19
+        });
+
+        const esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 19
+        });
+
+        const cartoDarkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' + (window.location.hostname.endsWith('usatfne.org') ? '?key=cb1_3t2j_1_e257edd4cec96e1992f59cd9' : ''), {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        });
+
+        const cartoLightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png' + (window.location.hostname.endsWith('usatfne.org') ? '?key=cb1_3t2j_1_e257edd4cec96e1992f59cd9' : ''), {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        });
+
+        const openTopoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+            maxZoom: 17
+        });
+
+        const esriTopoLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 19
+        });
+
+        const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        });
+
+        let openFreeMapPositronLayer = null;
+        let openFreeMapLibertyLayer = null;
+
+        function getOrCreateMapLibreLayer(type) {
+            if (typeof L.maplibreGL !== 'function') return cartoLightLayer;
+            try {
+                if (type === 'ofm_positron') {
+                    if (!openFreeMapPositronLayer) {
+                        openFreeMapPositronLayer = L.maplibreGL({
+                            style: 'https://tiles.openfreemap.org/styles/positron',
+                            attribution: '&copy; <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+                        });
+                    }
+                    return openFreeMapPositronLayer;
+                } else if (type === 'ofm_liberty') {
+                    if (!openFreeMapLibertyLayer) {
+                        openFreeMapLibertyLayer = L.maplibreGL({
+                            style: 'https://tiles.openfreemap.org/styles/liberty',
+                            attribution: '&copy; <a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+                        });
+                    }
+                    return openFreeMapLibertyLayer;
+                }
+            } catch (e) {
+                console.warn('MapLibre GL layer initialization failed, falling back to CARTO Light:', e);
+                return cartoLightLayer;
+            }
+            return cartoLightLayer;
+        }
+
+        let currentTileLayer = esriStreetLayer;
+        
+        try {
+            currentTileLayer.addTo(map);
+        } catch (e) {
+            console.warn('Failed to add default tile layer, falling back to CARTO Light:', e);
+            currentTileLayer = cartoLightLayer;
+            currentTileLayer.addTo(map);
+        }
+
+        function changeMapLayer(val) {
+            if (!val) {
+                val = document.getElementById('mapLayerSelect').value;
+            }
+
+            // Sync both Mobile and Desktop dropdowns
+            const desktopSelect = document.getElementById('mapLayerSelect');
+            const mobileSelect = document.getElementById('mapStyle');
+            if (desktopSelect && desktopSelect.value !== val) desktopSelect.value = val;
+            if (mobileSelect && mobileSelect.value !== val) mobileSelect.value = val;
+
+            if (currentTileLayer) {
+                try {
+                    map.removeLayer(currentTileLayer);
+                } catch (e) {}
+            }
+            
+            if (val === 'ofm_positron') {
+                currentTileLayer = getOrCreateMapLibreLayer('ofm_positron');
+            } else if (val === 'ofm_liberty') {
+                currentTileLayer = getOrCreateMapLibreLayer('ofm_liberty');
+            } else if (val === 'esri_street') {
+                currentTileLayer = esriStreetLayer;
+            } else if (val === 'esri_satellite') {
+                currentTileLayer = esriSatelliteLayer;
+            } else if (val === 'carto_dark') {
+                currentTileLayer = cartoDarkLayer;
+            } else if (val === 'carto_light') {
+                currentTileLayer = cartoLightLayer;
+            } else if (val === 'open_topo') {
+                currentTileLayer = openTopoLayer;
+            } else if (val === 'esri_topo') {
+                currentTileLayer = esriTopoLayer;
+            } else if (val === 'osm') {
+                currentTileLayer = osmLayer;
+            }
+            
+            try {
+                currentTileLayer.addTo(map);
+            } catch (err) {
+                console.warn('Selected map layer failed to load in this iframe environment. Falling back to CARTO Light.', err);
+                currentTileLayer = cartoLightLayer;
+                currentTileLayer.addTo(map);
+            }
+        }
+
+        // Global Simulation State
+        let routeLatLngs = [];
+        let distances = [];
+        let totalDistanceMeters = 0;
+        
+        let polyline = null;
+        let marker = null;
+        let placemarkLayerGroup = L.layerGroup().addTo(map);
+        
+        let mileMarkersLayer = L.layerGroup();
+        let kmMarkersLayer = L.layerGroup();
+        let arrowsLayer = L.layerGroup();
+        
+        let animationId = null;
+        let isPlaying = false;
+        let currentDistanceMeters = 0;
+        let lastTimestamp = 0;
+        let followRunner = true;
+        let drawerOpen = false;
+
+        // Custom Runner Icon
+        const runnerIcon = L.divIcon({
+            className: 'runner-icon',
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+        });
+
+        // Sample B.A.A. Half Marathon Route (Franklin Park <-> Riverway)
+        const demoRoute = [
+            [42.3049, -71.0917], [42.3039, -71.0943], [42.3021, -71.0975], 
+            [42.3005, -71.1030], [42.2980, -71.1095], [42.3002, -71.1118],
+            [42.3040, -71.1155], [42.3075, -71.1170], [42.3115, -71.1175],
+            [42.3160, -71.1180], [42.3210, -71.1175], [42.3250, -71.1165],
+            [42.3295, -71.1150], [42.3330, -71.1130], [42.3360, -71.1105],
+            [42.3385, -71.1085], [42.3410, -71.1065],
+            [42.3395, -71.1090], [42.3365, -71.1115], [42.3335, -71.1140],
+            [42.3300, -71.1160], [42.3255, -71.1180], [42.3215, -71.1190],
+            [42.3165, -71.1195], [42.3120, -71.1190],
+            [42.3080, -71.1185], [42.3045, -71.1170], [42.3005, -71.1135],
+            [42.2990, -71.1085], [42.3015, -71.1040], [42.3030, -71.0985],
+            [42.3060, -71.0965], [42.3085, -71.0940], [42.3070, -71.0895],
+            [42.3045, -71.0890]
+        ];
+
+        function showError(msg) {
+            const errorBox = document.getElementById('errorBox');
+            const errorMsg = document.getElementById('errorMessage');
+            errorMsg.innerText = msg;
+            errorBox.classList.remove('hidden');
+            setTimeout(() => { errorBox.classList.add('hidden'); }, 5000);
+        }
+
+        function getDistanceMeters(lat1, lon1, lat2, lon2) {
+            return map.distance([lat1, lon1], [lat2, lon2]);
+        }
+
+        // Clean and sanitize KML descriptions from Google Maps / Mapgee exports
+        function cleanKmlDescription(rawHtml) {
+            if (!rawHtml) return "";
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(rawHtml, 'text/html');
+                
+                // 1. Check for Mapgee / Google Maps description container
+                const gvDesc = doc.querySelector('.gv_marker_info_window_desc');
+                if (gvDesc) {
+                    return gvDesc.innerHTML.trim();
+                }
+                
+                // 2. Check for Google Maps InfoWindow container (.gm-style-iw)
+                const gmIw = doc.querySelector('.gm-style-iw-d') || doc.querySelector('.gm-style-iw');
+                if (gmIw) {
+                    gmIw.querySelectorAll('*').forEach(el => el.removeAttribute('style'));
+                    return gmIw.innerHTML.trim();
+                }
+                
+                // 3. Fallback: Clean inline styles that force absolute positioning/popups
+                doc.body.querySelectorAll('*').forEach(el => {
+                    if (el.style) {
+                        el.style.position = '';
+                        el.style.boxShadow = '';
+                        el.style.background = '';
+                        el.style.backgroundColor = '';
+                        el.style.transform = '';
+                        el.style.border = '';
+                    }
+                });
+
+                return doc.body.innerHTML.trim();
+            } catch (e) {
+                return rawHtml;
+            }
+        }
+
+        function handleFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                parseKML(evt.target.result);
+            };
+            reader.readAsText(file);
+        }
+
+        function setupFileListeners() {
+            const desktopInput = document.getElementById('kmlInputDesktop');
+            const mobileInput = document.getElementById('kmlInputMobile');
+
+            if (desktopInput) desktopInput.addEventListener('change', handleFile);
+            if (mobileInput) mobileInput.addEventListener('change', handleFile);
+        }
+
+        function parseKML(kmlText) {
+            try {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(kmlText, "text/xml");
+                
+                const coordinatesTags = xmlDoc.getElementsByTagName("coordinates");
+                if (coordinatesTags.length === 0) {
+                    showError("No route coordinates found in KML.");
+                    return;
+                }
+
+                let bestCoordsString = "";
+                let maxPoints = 0;
+                for (let i = 0; i < coordinatesTags.length; i++) {
+                    const text = coordinatesTags[i].textContent.trim();
+                    const points = text.split(/\s+/);
+                    if (points.length > maxPoints) {
+                        maxPoints = points.length;
+                        bestCoordsString = text;
+                    }
+                }
+
+                const rawPoints = bestCoordsString.split(/\s+/);
+                const latLngs = [];
+                
+                rawPoints.forEach(p => {
+                    const parts = p.split(',');
+                    if (parts.length >= 2) {
+                        const lng = parseFloat(parts[0]);
+                        const lat = parseFloat(parts[1]);
+                        if (!isNaN(lat) && !isNaN(lng)) latLngs.push([lat, lng]);
+                    }
+                });
+
+                if (latLngs.length < 2) {
+                    showError("Not enough points in KML route.");
+                    return;
+                }
+
+                // Parse Waypoint Placemarks
+                const placemarks = xmlDoc.getElementsByTagName("Placemark");
+                const extractedPoints = [];
+
+                for (let i = 0; i < placemarks.length; i++) {
+                    const placemark = placemarks[i];
+                    const pointTag = placemark.getElementsByTagName("Point")[0];
+                    
+                    if (pointTag) {
+                        const nameTag = placemark.getElementsByTagName("name")[0];
+                        const name = nameTag ? nameTag.textContent.trim() : "Waypoint";
+                        const descTag = placemark.getElementsByTagName("description")[0];
+                        const rawDescription = descTag ? descTag.textContent.trim() : "";
+                        const description = cleanKmlDescription(rawDescription);
+                        const coordsTag = pointTag.getElementsByTagName("coordinates")[0];
+                        
+                        if (coordsTag) {
+                            const coords = coordsTag.textContent.trim().split(',');
+                            if (coords.length >= 2) {
+                                const lng = parseFloat(coords[0]);
+                                const lat = parseFloat(coords[1]);
+                                if (!isNaN(lat) && !isNaN(lng)) extractedPoints.push({ name: name, description: description, lat: lat, lng: lng });
+                            }
+                        }
+                    }
+                }
+
+                setupRoute(latLngs);
+                renderPlacemarks(extractedPoints);
+                
+            } catch (err) {
+                showError("Failed to parse KML file.");
+                console.error(err);
+            }
+        }
+
+        function renderPlacemarks(points) {
+            placemarkLayerGroup.clearLayers();
+            
+            points.forEach(pt => {
+                // Interactive container with touch-friendly hit target for mobile devices
+                const iconHtml = `
+                    <div class="relative flex items-center cursor-pointer p-1.5 -m-1.5 select-none">
+                        <div class="bg-white border-2 border-[#0032A0] shadow-md rounded-full w-5 h-5 flex items-center justify-center cursor-pointer hover:scale-125 active:scale-110 transition-transform z-10 shrink-0">
+                            <div class="w-2.5 h-2.5 bg-[#FFD100] rounded-full"></div>
+                        </div>
+                        <div class="waypoint-label-text ml-1.5 px-2 py-1 bg-white/95 border border-blue-200 text-[#0032A0] text-[11px] font-bold rounded-md shadow-sm whitespace-nowrap drop-shadow-sm cursor-pointer hover:bg-yellow-50 active:bg-yellow-100 transition-colors">
+                            ${pt.name}
+                        </div>
+                    </div>
+                `;
+
+                const icon = L.divIcon({
+                    className: 'custom-waypoint-icon bg-transparent border-0',
+                    html: iconHtml,
+                    iconAnchor: [10, 15]
+                });
+
+                const marker = L.marker([pt.lat, pt.lng], { icon: icon, zIndexOffset: 500 }).addTo(placemarkLayerGroup);
+                
+                // Determine if there is actual description content
+                const hasDesc = pt.description && pt.description.trim() !== "";
+                const tooltipClass = `glass-panel border border-blue-200 shadow-xl rounded-xl p-3.5 w-72 sm:w-80 max-w-[320px] ${hasDesc ? '' : 'no-desc-tooltip'}`;
+                
+                const tooltipContent = `
+                    <div class="tooltip-dynamic-name text-[13px] font-bold text-[#0032A0] ${hasDesc ? 'mb-1.5 border-b border-gray-200 pb-1.5' : ''}">${pt.name}</div>
+                    ${hasDesc ? `<div class="text-[12px] font-normal text-gray-800 leading-relaxed max-h-80 overflow-y-auto mt-0.5 pointer-events-auto pr-1 select-text" style="scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;">${pt.description}</div>` : ''}
+                `;
+                
+                // Bind hover tooltip for desktop, which acts as a tap popup on mobile
+                marker.bindTooltip(tooltipContent, {
+                    permanent: false,
+                    direction: 'top',
+                    className: tooltipClass,
+                    offset: [0, -10],
+                    interactive: true,
+                    opacity: 1 // Ensure it's fully opaque when shown
+                });
+
+                // We remove bindPopup entirely to prevent the double-display issue on mobile devices.
+                // Leaflet's bindTooltip with interactive:true handles tap-to-show on mobile and hover on desktop perfectly.
+            });
+        }
+
+        function setupRoute(latLngs) {
+            resetSimulation();
+            
+            if (polyline) map.removeLayer(polyline);
+            if (marker) map.removeLayer(marker);
+
+            routeLatLngs = latLngs;
+            distances = [0];
+            totalDistanceMeters = 0;
+
+            for (let i = 1; i < routeLatLngs.length; i++) {
+                const p1 = routeLatLngs[i-1];
+                const p2 = routeLatLngs[i];
+                const dist = getDistanceMeters(p1[0], p1[1], p2[0], p2[1]);
+                totalDistanceMeters += dist;
+                distances.push(totalDistanceMeters);
+            }
+
+            polyline = L.polyline(routeLatLngs, {
+                color: '#0032A0', 
+                weight: 6, 
+                opacity: 0.85,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(map);
+            
+            generateDistanceMarkers();
+            generateArrows();
+            
+            map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+
+            marker = L.marker(routeLatLngs[0], {
+                icon: runnerIcon, 
+                zIndexOffset: 1000,
+                interactive: false
+            }).addTo(map);
+            
+            toggleMarkers();
+            updateDisplay();
+        }
+
+        function generateDistanceMarkers() {
+            mileMarkersLayer.clearLayers();
+            kmMarkersLayer.clearLayers();
+
+            let nextKm = 1000;
+            let nextMi = 1609.344;
+
+            for (let i = 0; i < distances.length - 1; i++) {
+                const d1 = distances[i];
+                const d2 = distances[i+1];
+                const p1 = routeLatLngs[i];
+                const p2 = routeLatLngs[i+1];
+
+                while (nextKm <= d2) {
+                    const ratio = (d2 === d1) ? 0 : (nextKm - d1) / (d2 - d1);
+                    const lat = p1[0] + (p2[0] - p1[0]) * ratio;
+                    const lng = p1[1] + (p2[1] - p1[1]) * ratio;
+                    
+                    const kmNum = Math.round(nextKm / 1000);
+                    const icon = L.divIcon({
+                        className: 'bg-white border-2 border-blue-700 text-blue-800 font-bold text-[10px] rounded-sm shadow-sm flex items-center justify-center z-10',
+                        html: `${kmNum}k`,
+                        iconSize: [26, 18],
+                        iconAnchor: [13, 9]
+                    });
+                    L.marker([lat, lng], { icon: icon }).addTo(kmMarkersLayer);
+                    nextKm += 1000;
+                }
+
+                while (nextMi <= d2) {
+                    const ratio = (d2 === d1) ? 0 : (nextMi - d1) / (d2 - d1);
+                    const lat = p1[0] + (p2[0] - p1[0]) * ratio;
+                    const lng = p1[1] + (p2[1] - p1[1]) * ratio;
+                    
+                    const miNum = Math.round(nextMi / 1609.344);
+                    const icon = L.divIcon({
+                        className: 'bg-yellow-400 border-2 border-blue-900 text-blue-900 font-bold text-[10px] rounded-sm shadow-sm flex items-center justify-center z-10',
+                        html: `${miNum}m`,
+                        iconSize: [26, 18],
+                        iconAnchor: [13, 9]
+                    });
+                    L.marker([lat, lng], { icon: icon }).addTo(mileMarkersLayer);
+                    nextMi += 1609.344;
+                }
+            }
+        }
+
+        function generateArrows() {
+            arrowsLayer.clearLayers();
+            let nextArrowDist = 150;
+            const arrowInterval = 350;
+
+            for (let i = 0; i < distances.length - 1; i++) {
+                const d1 = distances[i];
+                const d2 = distances[i+1];
+                const p1 = routeLatLngs[i];
+                const p2 = routeLatLngs[i+1];
+
+                while (nextArrowDist <= d2) {
+                    const ratio = (d2 === d1) ? 0 : (nextArrowDist - d1) / (d2 - d1);
+                    const lat = p1[0] + (p2[0] - p1[0]) * ratio;
+                    const lng = p1[1] + (p2[1] - p1[1]) * ratio;
+
+                    const dy = p2[0] - p1[0];
+                    const dx = p2[1] - p1[1];
+                    const angle = Math.atan2(dx, dy) * (180 / Math.PI);
+
+                    const arrowIcon = L.divIcon({
+                        className: 'bg-transparent border-0',
+                        html: `<div style="transform: rotate(${angle}deg); width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#FFD100" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0px 0px 2px #0032A0);">
+                                    <polyline points="18 15 12 9 6 15"></polyline>
+                                </svg>
+                               </div>`,
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    });
+
+                    L.marker([lat, lng], { icon: arrowIcon, interactive: false }).addTo(arrowsLayer);
+                    nextArrowDist += arrowInterval;
+                }
+            }
+        }
+
+        function toggleMarkers() {
+            const showKm = document.getElementById('toggleKm').checked;
+            const showMi = document.getElementById('toggleMi').checked;
+            const showArrows = document.getElementById('toggleArrows').checked;
+            const showLabels = document.getElementById('toggleWaypointLabels') ? document.getElementById('toggleWaypointLabels').checked : true;
+
+            if (showKm) map.addLayer(kmMarkersLayer); 
+            else map.removeLayer(kmMarkersLayer);
+
+            if (showMi) map.addLayer(mileMarkersLayer); 
+            else map.removeLayer(mileMarkersLayer);
+            
+            if (showArrows) map.addLayer(arrowsLayer);
+            else map.removeLayer(arrowsLayer);
+
+            // Waypoint dots always remain visible. We toggle only the text labels.
+            const mapEl = document.getElementById('map');
+            if (showLabels) {
+                mapEl.classList.remove('hide-waypoint-labels');
+            } else {
+                mapEl.classList.add('hide-waypoint-labels');
+            }
+            
+            if (!map.hasLayer(placemarkLayerGroup)) {
+                map.addLayer(placemarkLayerGroup);
+            }
+        }
+
+        function animate(timestamp) {
+            if (!isPlaying) return;
+            
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const deltaTime = (timestamp - lastTimestamp) / 1000;
+            lastTimestamp = timestamp;
+
+            const speedMultiplier = parseFloat(document.getElementById('speedSlider').value);
+            const baseSpeed = 3.33; // ~7.5 mph base speed
+            
+            currentDistanceMeters += (baseSpeed * speedMultiplier * deltaTime);
+
+            if (currentDistanceMeters >= totalDistanceMeters) {
+                currentDistanceMeters = totalDistanceMeters;
+                updateMarkerPosition();
+                updateDisplay();
+                pauseSimulation();
+                return;
+            }
+
+            updateMarkerPosition();
+            updateDisplay();
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function updateMarkerPosition() {
+            for (let i = 0; i < distances.length - 1; i++) {
+                const d1 = distances[i];
+                const d2 = distances[i+1];
+                
+                if (currentDistanceMeters >= d1 && currentDistanceMeters <= d2) {
+                    const segmentLength = d2 - d1;
+                    let ratio = 0;
+                    if (segmentLength > 0) ratio = (currentDistanceMeters - d1) / segmentLength;
+                    
+                    const p1 = routeLatLngs[i];
+                    const p2 = routeLatLngs[i+1];
+                    
+                    const currentLat = p1[0] + (p2[0] - p1[0]) * ratio;
+                    const currentLng = p1[1] + (p2[1] - p1[1]) * ratio;
+                    
+                    marker.setLatLng([currentLat, currentLng]);
+                    
+                    if (followRunner) {
+                        map.setView([currentLat, currentLng], map.getZoom(), { animate: false });
+                    }
+                    
+                    break;
+                }
+            }
+        }
+
+        function updateDisplay() {
+            if (totalDistanceMeters === 0) return;
+
+            const unitNodes = document.querySelectorAll('input[name="units"]');
+            let unit = 'km';
+            unitNodes.forEach(node => { if (node.checked) unit = node.value; });
+            
+            const conversion = unit === 'mi' ? 0.000621371 : 0.001; 
+            const unitLabel = unit === 'mi' ? 'mi' : 'km';
+
+            const current = (currentDistanceMeters * conversion).toFixed(2);
+            const remaining = ((totalDistanceMeters - currentDistanceMeters) * conversion).toFixed(2);
+            let progress = ((currentDistanceMeters / totalDistanceMeters) * 100);
+            
+            if (progress > 100) progress = 100;
+
+            document.getElementById('statDistance').innerHTML = `${current} <span class="text-xs font-normal text-gray-500">${unitLabel}</span>`;
+            document.getElementById('statRemaining').innerText = `${remaining} ${unitLabel}`;
+            document.getElementById('statProgress').innerText = `${progress.toFixed(1)}%`;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+
+            // Mobile HUD Sync
+            const hudDistEl = document.getElementById('hudDistance');
+            if (hudDistEl) {
+                hudDistEl.innerHTML = `${current} <span class="text-sm font-bold">${unitLabel}</span>`;
+            }
+        }
+
+        function startSimulation() {
+            if (routeLatLngs.length === 0) {
+                showError("No route loaded.");
+                return;
+            }
+            if (currentDistanceMeters >= totalDistanceMeters) resetSimulation();
+            
+            isPlaying = true;
+            lastTimestamp = 0;
+            
+            document.getElementById('btnPlay').disabled = true;
+            document.getElementById('btnPlay').classList.add('opacity-40', 'cursor-not-allowed');
+            document.getElementById('btnPause').disabled = false;
+            document.getElementById('btnPause').classList.remove('opacity-40', 'cursor-not-allowed');
+            
+            // Sync mobile HUD icons
+            document.getElementById('hudPlayIcon').classList.add('hidden');
+            document.getElementById('hudPauseIcon').classList.remove('hidden');
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function pauseSimulation() {
+            isPlaying = false;
+            cancelAnimationFrame(animationId);
+            
+            document.getElementById('btnPlay').disabled = false;
+            document.getElementById('btnPlay').classList.remove('opacity-40', 'cursor-not-allowed');
+            document.getElementById('btnPause').disabled = true;
+            document.getElementById('btnPause').classList.add('opacity-40', 'cursor-not-allowed');
+            
+            document.getElementById('hudPlayIcon').classList.remove('hidden');
+            document.getElementById('hudPauseIcon').classList.add('hidden');
+        }
+
+        function togglePlayPause() {
+            if (isPlaying) pauseSimulation();
+            else startSimulation();
+        }
+
+        function resetSimulation() {
+            pauseSimulation();
+            currentDistanceMeters = 0;
+            
+            if (marker && routeLatLngs.length > 0) {
+                marker.setLatLng(routeLatLngs[0]);
+                if (followRunner) map.setView(routeLatLngs[0], map.getZoom(), { animate: true });
+            }
+            updateDisplay();
+        }
+
+        function toggleFollow() {
+            const toggleElement = document.getElementById('followToggle');
+            if(toggleElement) {
+                followRunner = toggleElement.checked;
+                if (followRunner && marker) {
+                    map.setView(marker.getLatLng(), map.getZoom(), { animate: true });
+                }
+                updateHudFollowBtn();
+            }
+        }
+
+        function toggleFollowFromHud() {
+            followRunner = !followRunner;
+            document.getElementById('followToggle').checked = followRunner;
+            if (followRunner && marker) {
+                map.setView(marker.getLatLng(), map.getZoom(), { animate: true });
+            }
+            updateHudFollowBtn();
+        }
+
+        function updateHudFollowBtn() {
+            const hudBtn = document.getElementById('hudFollowBtn');
+            if (followRunner) {
+                hudBtn.className = "px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-sm active:scale-95";
+                hudBtn.innerText = "桃 Following";
+            } else {
+                hudBtn.className = "px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200 shadow-sm active:scale-95";
+                hudBtn.innerText = "桃 Free Map";
+            }
+        }
+
+        function toggleDrawer() {
+            const sidebar = document.getElementById('sidebar');
+            drawerOpen = !drawerOpen;
+            if (drawerOpen) {
+                sidebar.classList.remove('translate-y-full');
+            } else {
+                sidebar.classList.add('translate-y-full');
+            }
+        }
+
+        window.onload = function() {
+            setupFileListeners();
+
+            const embeddedKmlEl = document.getElementById('defaultKmlData');
+            const embeddedKmlText = embeddedKmlEl ? embeddedKmlEl.textContent.trim() : '';
+
+            // Check for embedded KML
+            if (embeddedKmlText && !embeddedKmlText.includes('PASTE_YOUR_KML_CONTENT_HERE')) {
+                parseKML(embeddedKmlText);
+                return;
+            }
+
+            // Check for ?kml= query parameter first, otherwise fall back to local course.kml
+            const kmlParam = new URLSearchParams(window.location.search).get('kml');
+            const kmlTarget = kmlParam ? kmlParam : 'course.kml';
+
+            // Fetch KML file if available
+            fetch(kmlTarget)
+                .then(response => {
+                    if (!response.ok) throw new Error('course.kml not found on server');
+                    return response.text();
+                })
+                .then(kmlText => {
+                    parseKML(kmlText);
+                })
+                .catch(() => {
+                    // Fallback to sample route
+                    setupRoute(demoRoute);
+                });
+        };
+    </script>
+</body>
+</html>
