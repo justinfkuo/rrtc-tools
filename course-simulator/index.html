@@ -1,7 +1,7 @@
-﻿<!-- 
+﻿<!--
   File Name: index.html
-  Last Edited: October 5, 2026
-  Version: 1.2.7    
+  Last Edited: November 18, 2026
+  Version: 1.2.8
   Description: A web-based interactive map application for visualizing and simulating USATF/RRTC certified running courses. It allows users to upload KML route files, preview race paths, track distances, view waypoints, and simulate a runner's progress across various background map layers.
 -->
 <!DOCTYPE html>
@@ -14,13 +14,13 @@
     <script>
         // Polyfill window.top and window.parent access for sandboxed / cross-origin iframes
         try {
-            try { 
-                var _testTop = window.top.location.href; 
+            try {
+                var _testTop = window.top.location.href;
             } catch (e) {
                 Object.defineProperty(window, 'top', { get: function() { return window; } });
             }
-            try { 
-                var _testParent = window.parent.location.href; 
+            try {
+                var _testParent = window.parent.location.href;
             } catch (e) {
                 Object.defineProperty(window, 'parent', { get: function() { return window; } });
             }
@@ -28,11 +28,11 @@
             console.warn('Iframe polyfill error:', e);
         }
     </script>
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.20/leaflet-maplibre-gl.js"></script>
@@ -84,9 +84,9 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
-        #map { 
-            height: 100%; 
-            width: 100%; 
+        #map {
+            height: 100%;
+            width: 100%;
             z-index: 1;
         }
 
@@ -131,7 +131,7 @@
 
         /* Tooltip & Popup text wrapping & interactivity overrides */
         .leaflet-tooltip, .leaflet-popup-content-wrapper {
-            white-space: normal !important; 
+            white-space: normal !important;
             pointer-events: auto !important; /* Allow interaction with tooltip/popup */
             width: max-content;
             max-width: 320px !important;
@@ -218,7 +218,7 @@
         <div id="map" class="flex-1 z-0"></div>
 
         <aside id="sidebar" class="absolute md:relative bottom-0 left-0 right-0 md:top-0 w-full md:w-80 max-h-[85dvh] md:max-h-full bg-white rounded-t-2xl md:rounded-none shadow-[0_-5px_25px_rgba(0,0,0,0.15)] md:shadow-[4px_0_15px_rgba(0,0,0,0.1)] z-20 flex flex-col drawer-transition translate-y-full md:translate-y-0">
-            
+
             <!-- Mobile Drawer Drag Handle -->
             <div onclick="toggleDrawer()" class="md:hidden w-full py-2.5 flex flex-col items-center justify-center cursor-pointer border-b border-gray-100 bg-gray-50 rounded-t-2xl">
                 <div class="w-12 h-1.5 bg-gray-300 rounded-full mb-1"></div>
@@ -327,17 +327,17 @@
                         <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                         Live Statistics
                     </h3>
-                    
+
                     <div class="flex justify-between items-baseline mb-1">
                         <span class="text-xs font-medium text-gray-600">Distance Completed:</span>
                         <span id="statDistance" class="text-xl font-black text-blue-950">0.00</span>
                     </div>
-                    
+
                     <div class="flex justify-between items-baseline mb-3">
                         <span class="text-xs font-medium text-gray-500">Distance Remaining:</span>
                         <span id="statRemaining" class="text-sm font-bold text-gray-700">0.00</span>
                     </div>
-                    
+
                     <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden shadow-inner mb-1">
                         <div id="progressBar" class="baa-yellow-bg h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
                     </div>
@@ -345,10 +345,10 @@
                         <span id="statProgress" class="text-[10px] font-bold text-gray-500">0%</span>
                     </div>
                 </div>
-                
+
                 <!-- Version Info -->
                 <div class="text-center pt-2 pb-8 md:pb-4">
-                    <span class="text-[10px] font-semibold text-gray-400 tracking-wider">Simulator v1.2.7</span>
+                    <span class="text-[10px] font-semibold text-gray-400 tracking-wider">Simulator v1.2.8</span>
                 </div>
 
             </div>
@@ -361,12 +361,12 @@
     </script>
 
     <script>
-        
+
         // Initialize Leaflet Map centered on Franklin Park / Boston Emerald Necklace
         const map = L.map('map', {
             zoomControl: false
-        }).setView([42.302, -71.093], 14); 
-        
+        }).setView([42.302, -71.093], 14);
+
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         // Tile Layer Definitions
@@ -438,7 +438,7 @@
         }
 
         let currentTileLayer = esriStreetLayer;
-        
+
         try {
             currentTileLayer.addTo(map);
         } catch (e) {
@@ -463,7 +463,7 @@
                     map.removeLayer(currentTileLayer);
                 } catch (e) {}
             }
-            
+
             if (val === 'ofm_positron') {
                 currentTileLayer = getOrCreateMapLibreLayer('ofm_positron');
             } else if (val === 'ofm_liberty') {
@@ -483,7 +483,7 @@
             } else if (val === 'osm') {
                 currentTileLayer = osmLayer;
             }
-            
+
             try {
                 currentTileLayer.addTo(map);
             } catch (err) {
@@ -497,15 +497,15 @@
         let routeLatLngs = [];
         let distances = [];
         let totalDistanceMeters = 0;
-        
+
         let polyline = null;
         let marker = null;
         let placemarkLayerGroup = L.layerGroup().addTo(map);
-        
+
         let mileMarkersLayer = L.layerGroup();
         let kmMarkersLayer = L.layerGroup();
         let arrowsLayer = L.layerGroup();
-        
+
         let animationId = null;
         let isPlaying = false;
         let currentDistanceMeters = 0;
@@ -522,7 +522,7 @@
 
         // Sample B.A.A. Half Marathon Route (Franklin Park <-> Riverway)
         const demoRoute = [
-            [42.3049, -71.0917], [42.3039, -71.0943], [42.3021, -71.0975], 
+            [42.3049, -71.0917], [42.3039, -71.0943], [42.3021, -71.0975],
             [42.3005, -71.1030], [42.2980, -71.1095], [42.3002, -71.1118],
             [42.3040, -71.1155], [42.3075, -71.1170], [42.3115, -71.1175],
             [42.3160, -71.1180], [42.3210, -71.1175], [42.3250, -71.1165],
@@ -555,20 +555,20 @@
             try {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(rawHtml, 'text/html');
-                
+
                 // 1. Check for Mapgee / Google Maps description container
                 const gvDesc = doc.querySelector('.gv_marker_info_window_desc');
                 if (gvDesc) {
                     return gvDesc.innerHTML.trim();
                 }
-                
+
                 // 2. Check for Google Maps InfoWindow container (.gm-style-iw)
                 const gmIw = doc.querySelector('.gm-style-iw-d') || doc.querySelector('.gm-style-iw');
                 if (gmIw) {
                     gmIw.querySelectorAll('*').forEach(el => el.removeAttribute('style'));
                     return gmIw.innerHTML.trim();
                 }
-                
+
                 // 3. Fallback: Clean inline styles that force absolute positioning/popups
                 doc.body.querySelectorAll('*').forEach(el => {
                     if (el.style) {
@@ -609,7 +609,7 @@
             try {
                 const parser = new DOMParser();
                 const xmlDoc = parser.parseFromString(kmlText, "text/xml");
-                
+
                 const coordinatesTags = xmlDoc.getElementsByTagName("coordinates");
                 if (coordinatesTags.length === 0) {
                     showError("No route coordinates found in KML.");
@@ -629,7 +629,7 @@
 
                 const rawPoints = bestCoordsString.split(/\s+/);
                 const latLngs = [];
-                
+
                 rawPoints.forEach(p => {
                     const parts = p.split(',');
                     if (parts.length >= 2) {
@@ -651,7 +651,7 @@
                 for (let i = 0; i < placemarks.length; i++) {
                     const placemark = placemarks[i];
                     const pointTag = placemark.getElementsByTagName("Point")[0];
-                    
+
                     if (pointTag) {
                         const nameTag = placemark.getElementsByTagName("name")[0];
                         const name = nameTag ? nameTag.textContent.trim() : "Waypoint";
@@ -659,7 +659,7 @@
                         const rawDescription = descTag ? descTag.textContent.trim() : "";
                         const description = cleanKmlDescription(rawDescription);
                         const coordsTag = pointTag.getElementsByTagName("coordinates")[0];
-                        
+
                         if (coordsTag) {
                             const coords = coordsTag.textContent.trim().split(',');
                             if (coords.length >= 2) {
@@ -673,7 +673,7 @@
 
                 setupRoute(latLngs);
                 renderPlacemarks(extractedPoints);
-                
+
             } catch (err) {
                 showError("Failed to parse KML file.");
                 console.error(err);
@@ -682,7 +682,7 @@
 
         function renderPlacemarks(points) {
             placemarkLayerGroup.clearLayers();
-            
+
             points.forEach(pt => {
                 // Interactive container with touch-friendly hit target for mobile devices
                 const iconHtml = `
@@ -703,16 +703,16 @@
                 });
 
                 const marker = L.marker([pt.lat, pt.lng], { icon: icon, zIndexOffset: 500 }).addTo(placemarkLayerGroup);
-                
+
                 // Determine if there is actual description content
                 const hasDesc = pt.description && pt.description.trim() !== "";
                 const tooltipClass = `glass-panel border border-blue-200 shadow-xl rounded-xl p-3.5 w-72 sm:w-80 max-w-[320px] ${hasDesc ? '' : 'no-desc-tooltip'}`;
-                
+
                 const tooltipContent = `
                     <div class="tooltip-dynamic-name text-[13px] font-bold text-[#0032A0] ${hasDesc ? 'mb-1.5 border-b border-gray-200 pb-1.5' : ''}">${pt.name}</div>
                     ${hasDesc ? `<div class="text-[12px] font-normal text-gray-800 leading-relaxed max-h-80 overflow-y-auto mt-0.5 pointer-events-auto pr-1 select-text" style="scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent;">${pt.description}</div>` : ''}
                 `;
-                
+
                 // Bind hover tooltip for desktop, which acts as a tap popup on mobile
                 marker.bindTooltip(tooltipContent, {
                     permanent: false,
@@ -730,7 +730,7 @@
 
         function setupRoute(latLngs) {
             resetSimulation();
-            
+
             if (polyline) map.removeLayer(polyline);
             if (marker) map.removeLayer(marker);
 
@@ -747,24 +747,24 @@
             }
 
             polyline = L.polyline(routeLatLngs, {
-                color: '#0032A0', 
-                weight: 6, 
+                color: '#0032A0',
+                weight: 6,
                 opacity: 0.85,
                 lineCap: 'round',
                 lineJoin: 'round'
             }).addTo(map);
-            
+
             generateDistanceMarkers();
             generateArrows();
-            
+
             map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
 
             marker = L.marker(routeLatLngs[0], {
-                icon: runnerIcon, 
+                icon: runnerIcon,
                 zIndexOffset: 1000,
                 interactive: false
             }).addTo(map);
-            
+
             toggleMarkers();
             updateDisplay();
         }
@@ -786,7 +786,7 @@
                     const ratio = (d2 === d1) ? 0 : (nextKm - d1) / (d2 - d1);
                     const lat = p1[0] + (p2[0] - p1[0]) * ratio;
                     const lng = p1[1] + (p2[1] - p1[1]) * ratio;
-                    
+
                     const kmNum = Math.round(nextKm / 1000);
                     const icon = L.divIcon({
                         className: 'bg-white border-2 border-blue-700 text-blue-800 font-bold text-[10px] rounded-sm shadow-sm flex items-center justify-center z-10',
@@ -802,7 +802,7 @@
                     const ratio = (d2 === d1) ? 0 : (nextMi - d1) / (d2 - d1);
                     const lat = p1[0] + (p2[0] - p1[0]) * ratio;
                     const lng = p1[1] + (p2[1] - p1[1]) * ratio;
-                    
+
                     const miNum = Math.round(nextMi / 1609.344);
                     const icon = L.divIcon({
                         className: 'bg-yellow-400 border-2 border-blue-900 text-blue-900 font-bold text-[10px] rounded-sm shadow-sm flex items-center justify-center z-10',
@@ -859,12 +859,12 @@
             const showArrows = document.getElementById('toggleArrows').checked;
             const showLabels = document.getElementById('toggleWaypointLabels') ? document.getElementById('toggleWaypointLabels').checked : true;
 
-            if (showKm) map.addLayer(kmMarkersLayer); 
+            if (showKm) map.addLayer(kmMarkersLayer);
             else map.removeLayer(kmMarkersLayer);
 
-            if (showMi) map.addLayer(mileMarkersLayer); 
+            if (showMi) map.addLayer(mileMarkersLayer);
             else map.removeLayer(mileMarkersLayer);
-            
+
             if (showArrows) map.addLayer(arrowsLayer);
             else map.removeLayer(arrowsLayer);
 
@@ -875,7 +875,7 @@
             } else {
                 mapEl.classList.add('hide-waypoint-labels');
             }
-            
+
             if (!map.hasLayer(placemarkLayerGroup)) {
                 map.addLayer(placemarkLayerGroup);
             }
@@ -883,14 +883,14 @@
 
         function animate(timestamp) {
             if (!isPlaying) return;
-            
+
             if (!lastTimestamp) lastTimestamp = timestamp;
             const deltaTime = (timestamp - lastTimestamp) / 1000;
             lastTimestamp = timestamp;
 
             const speedMultiplier = parseFloat(document.getElementById('speedSlider').value);
             const baseSpeed = 3.33; // ~7.5 mph base speed
-            
+
             currentDistanceMeters += (baseSpeed * speedMultiplier * deltaTime);
 
             if (currentDistanceMeters >= totalDistanceMeters) {
@@ -911,24 +911,24 @@
             for (let i = 0; i < distances.length - 1; i++) {
                 const d1 = distances[i];
                 const d2 = distances[i+1];
-                
+
                 if (currentDistanceMeters >= d1 && currentDistanceMeters <= d2) {
                     const segmentLength = d2 - d1;
                     let ratio = 0;
                     if (segmentLength > 0) ratio = (currentDistanceMeters - d1) / segmentLength;
-                    
+
                     const p1 = routeLatLngs[i];
                     const p2 = routeLatLngs[i+1];
-                    
+
                     const currentLat = p1[0] + (p2[0] - p1[0]) * ratio;
                     const currentLng = p1[1] + (p2[1] - p1[1]) * ratio;
-                    
+
                     marker.setLatLng([currentLat, currentLng]);
-                    
+
                     if (followRunner) {
                         map.setView([currentLat, currentLng], map.getZoom(), { animate: false });
                     }
-                    
+
                     break;
                 }
             }
@@ -940,14 +940,14 @@
             const unitNodes = document.querySelectorAll('input[name="units"]');
             let unit = 'km';
             unitNodes.forEach(node => { if (node.checked) unit = node.value; });
-            
-            const conversion = unit === 'mi' ? 0.000621371 : 0.001; 
+
+            const conversion = unit === 'mi' ? 0.000621371 : 0.001;
             const unitLabel = unit === 'mi' ? 'mi' : 'km';
 
             const current = (currentDistanceMeters * conversion).toFixed(2);
             const remaining = ((totalDistanceMeters - currentDistanceMeters) * conversion).toFixed(2);
             let progress = ((currentDistanceMeters / totalDistanceMeters) * 100);
-            
+
             if (progress > 100) progress = 100;
 
             document.getElementById('statDistance').innerHTML = `${current} <span class="text-xs font-normal text-gray-500">${unitLabel}</span>`;
@@ -968,15 +968,15 @@
                 return;
             }
             if (currentDistanceMeters >= totalDistanceMeters) resetSimulation();
-            
+
             isPlaying = true;
             lastTimestamp = 0;
-            
+
             document.getElementById('btnPlay').disabled = true;
             document.getElementById('btnPlay').classList.add('opacity-40', 'cursor-not-allowed');
             document.getElementById('btnPause').disabled = false;
             document.getElementById('btnPause').classList.remove('opacity-40', 'cursor-not-allowed');
-            
+
             // Sync mobile HUD icons
             document.getElementById('hudPlayIcon').classList.add('hidden');
             document.getElementById('hudPauseIcon').classList.remove('hidden');
@@ -987,12 +987,12 @@
         function pauseSimulation() {
             isPlaying = false;
             cancelAnimationFrame(animationId);
-            
+
             document.getElementById('btnPlay').disabled = false;
             document.getElementById('btnPlay').classList.remove('opacity-40', 'cursor-not-allowed');
             document.getElementById('btnPause').disabled = true;
             document.getElementById('btnPause').classList.add('opacity-40', 'cursor-not-allowed');
-            
+
             document.getElementById('hudPlayIcon').classList.remove('hidden');
             document.getElementById('hudPauseIcon').classList.add('hidden');
         }
@@ -1005,7 +1005,7 @@
         function resetSimulation() {
             pauseSimulation();
             currentDistanceMeters = 0;
-            
+
             if (marker && routeLatLngs.length > 0) {
                 marker.setLatLng(routeLatLngs[0]);
                 if (followRunner) map.setView(routeLatLngs[0], map.getZoom(), { animate: true });
